@@ -1,0 +1,294 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Reservoir Renewal — Step 4</title>
+
+  <!-- fonts & icons -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Open+Sans:ital,wght@0,300..800;1,300..800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <style>
+    :root {
+      --w: 850px; --pad:16px; --gap:14px; --br:10px;
+      --ink:#e7eef7; --muted:#aac2de; --hint:#9bb4d3;
+      --bg:#0b0f14; --card:#121925; --border:#243247; --well:#0d1420; --well2:#1e2a3a;
+      --ok:#7bd88f; --warn:#f7c948; --bad:#ff7b7b; --accent:#ADFB13;
+      --run-grey:#1b2433; --run-green:#ADFB13; --run-blue:#39B8FF; --blue:#0171e3;
+    }
+    html, body { margin:0; padding:0; }
+    *, *::before, *::after { box-sizing:border-box; }
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; background:var(--bg); color:var(--ink); }
+
+    .wrap { max-width:var(--w); margin:34px auto; padding:0 calc(var(--pad) + 2px); }
+    .pill { padding:2px 8px; border-radius:16px; border:1px solid #2a3950; background:var(--well); color:var(--muted); font-size:12px; }
+
+    .btn { font-size:14px; background:var(--well2); color:var(--ink); border:1px solid #2a3950; padding:9px 14px; border-radius:8px; cursor:pointer; text-decoration:none; font-weight:600; display:inline-flex; align-items:center; gap:8px; }
+    .btn-grey { background:#1a2535; color:#7a8ca8; border-color:#2a3950; }
+    .btn-green { background:var(--accent); color:#121212; border-color:var(--accent); }
+    .btn-blue { background:var(--blue); color:#fff; border-color:var(--blue); }
+    .btn[disabled], .btn[aria-disabled="true"] { opacity:.55; cursor:not-allowed; pointer-events:none; }
+
+    .muted { color:var(--muted); }
+
+    /* Same stepper as Step 3 */
+    .stepper-wide { display:flex; gap:8px; width:100%; margin:0 0 16px 0; }
+    .stepper-wide .seg { flex:1; height:26px; border-radius:6px; background:#2a3950;
+      display:flex; align-items:center; justify-content:center;
+      font-size:12px; color:#a9b8cf; letter-spacing:0.2px; text-decoration:none; }
+    .stepper-wide .seg.active { background:var(--accent); color:#121212; font-weight:600; }
+    .stepper-wide .seg.done { background:#1f2a3c; color:#9db0c9; position:relative; }
+    .stepper-wide .seg.done::after{
+      content:"\f00c"; font-family:"Font Awesome 6 Free"; font-weight:900; font-size:11px; margin-left:6px;
+    }
+
+    .stepbar { display:flex; align-items:center; justify-content:space-between; margin:30px 0 40px 0; }
+    h1 { font-size:22px; margin:0; }
+
+    fieldset.box {
+      border:1px solid var(--border); border-radius:8px; background:var(--card);
+      padding:var(--pad); margin:0 0 18px 0;
+    }
+    legend { padding:0 6px; }
+
+    .kv { display:flex; gap:12px 18px; flex-wrap:wrap; font-size:13px; color:#9bb4d3; }
+    .kv b { color:#e7eef7; }
+
+    .grid-2 { display:grid; grid-template-columns: 1fr 1fr; gap:14px; }
+    @media (max-width: 700px){ .grid-2 { grid-template-columns: 1fr; } }
+
+    .actions { display:flex; justify-content:space-between; gap:10px; margin-top:10px; }
+    .note { font-size:12px; color:#9bb4d3; margin-top:15px; }
+
+    /* Card/progress styles aligned with Step 3 dosing cards */
+    .dose-card { border:1px solid #2a3950; border-radius:8px; background:#0d1420; padding:12px; }
+    .dose-card h3 { margin:0 0 10px 0; font-size:15px; display:flex; align-items:center; gap:8px; }
+    .dose-meta { font-size:12px; color:#9bb4d3; display:flex; justify-content:space-between; margin-bottom:8px; }
+    .bar { height:16px; background:#0c141f; border:1px solid #22324a; border-radius:4px; overflow:hidden; position:relative; }
+    .fill { height:100%; width:0%; background:#39B8FF; transition: width .2s linear; }
+    .fill.done { background: var(--run-green); transition: background 0.4s ease; }
+
+    .run-wide { margin-top:14px; display:flex; }
+    .run-btn-wide{
+      width:100%; height:48px; border-radius:999px;
+      background:var(--run-grey); color:#c9d6ea;
+      border:1px solid #2a3950;
+      font-size:16px; font-weight:800; letter-spacing:.2px; cursor:pointer;
+      display:inline-flex; align-items:center; justify-content:center; gap:10px;
+      transition: box-shadow .18s ease, border-color .18s ease, background .18s ease, color .18s ease, transform .05s ease;
+      box-shadow: inset 0 0 0 0 rgba(173,251,19,0);
+    }
+    .run-btn-wide:hover:not([disabled]):not(.is-running){
+      border-color: #0171e3;
+      box-shadow: 0 0 0 2px rgba(1,113,227,0.18), 0 0 14px rgba(1,113,227,0.28);
+      transform: translateY(-0.5px);
+    }
+    .run-btn-wide.is-running{
+      background: var(--run-grey);
+      color:#c9d6ea;
+      border-color: var(--run-blue);
+      box-shadow: 0 0 0 2px rgba(57,184,255,0.26);
+      animation: runpulse 1.2s ease-in-out infinite;
+    }
+    @keyframes runpulse{
+      0%   { box-shadow: 0 0 0 2px rgba(57,184,255,0.26), 0 0 0 0 rgba(57,184,255,0.00); }
+      60%  { box-shadow: 0 0 0 2px rgba(57,184,255,0.26), 0 0 14px 8px rgba(57,184,255,0.22); }
+      100% { box-shadow: 0 0 0 2px rgba(57,184,255,0.26), 0 0 0 0 rgba(57,184,255,0.00); }
+    }
+  </style>
+</head>
+<body>
+  {% include "header2.html" %}
+  <div class="wrap">
+
+    <!-- IDENTICAL STEPPER TO STEP 3 (now 5 steps total) -->
+    <div class="stepper-wide" aria-label="Wizard steps">
+      {% set total = 5 %}
+      {% for i in range(1, total + 1) %}
+        {% set is_active = (i == step) %}
+        {% set is_done = (i < step) %}
+        <a class="seg {% if is_active %}active{% endif %}"
+           href="{{ url_for('reservoirs.reservoir_wizard', step=i) }}"
+           {% if is_active %}aria-current="step"{% endif %}>
+          {% if is_done %}<i class="fa fa-check" aria-hidden="true"></i>{% endif %}
+          Step {{ i }}
+        </a>
+      {% endfor %}
+    </div>
+
+    <div class="stepbar">
+      <div>
+        <h1 style="margin:0 0 6px 0; font-size:22px;">Reservoir renewal</h1>
+        <div class="muted" style="font-size:13px;">Step {{ step }} of 5 — Mix and aerate the reservoir.</div>
+      </div>
+      <span class="pill" id="liveStamp">live</span>
+    </div>
+
+    <!-- Settings summary (matches Step 3 box style) -->
+    <fieldset class="box">
+      <legend>Mix settings</legend>
+      <div class="kv">
+        <div>Agitator plan: <b><span id="agPlan">{{ gs.get('agitator_run_sec') or 0 }}</span> s</b></div>
+        <div>Air pump plan: <b><span id="airPlan">{{ gs.get('air_pump_run_sec') or 0 }}</span> s</b></div>
+      </div>
+    </fieldset>
+
+    <!-- Action + progress (styled like dosing cards) -->
+    <fieldset class="box">
+      <legend>Run mix & aerate</legend>
+
+      <div class="run-wide" style="gap:10px;">
+        <button id="mixBtn" class="run-btn-wide" type="button">
+          <i class="fa-solid fa-water"></i> Mix and aerate reservoir
+        </button>
+      </div>
+
+      <div class="grid-2" style="margin-top:14px;">
+        <div class="dose-card" id="agCard">
+          <h3><i class="fa-solid fa-rotate"></i> Agitator</h3>
+          <div class="dose-meta">
+            <span>Status: <b id="agStatus">Idle</b></span>
+            <span>Time left: <b id="agEta">—</b></span>
+          </div>
+          <div class="bar"><div class="fill" id="agFill"></div></div>
+        </div>
+
+        <div class="dose-card" id="airCard">
+          <h3><i class="fa-solid fa-wind"></i> Air Pump</h3>
+          <div class="dose-meta">
+            <span>Status: <b id="airStatus">Idle</b></span>
+            <span>Time left: <b id="airEta">—</b></span>
+          </div>
+          <div class="bar"><div class="fill" id="airFill"></div></div>
+        </div>
+      </div>
+
+      <div class="actions">
+        <div></div>
+        <a class="btn btn-green" id="nextBtn" href="{{ url_for('reservoirs.reservoir_wizard', step=5) }}" style="display:none;">
+          Next step <i class="fa fa-chevron-right"></i>
+        </a>
+      </div>
+
+      <div class="note">
+        Both devices start together and stop exactly when their timers finish.
+      </div>
+    </fieldset>
+  </div>
+
+<script>
+const mixOverride = {{ (gs.get('mix_run_sec') if gs.get('mix_run_sec') is not none else 'null') | tojson }};
+let agPlanSec  = Number(document.getElementById('agPlan').textContent || 0);
+let airPlanSec = Number(document.getElementById('airPlan').textContent || 0);
+
+if (mixOverride !== null) {
+  agPlanSec  = Number(mixOverride) || 0;
+  airPlanSec = Number(mixOverride) || 0;
+  // Visually reflect the override so UI matches behaviour
+  document.getElementById('agPlan').textContent  = String(agPlanSec);
+  document.getElementById('airPlan').textContent = String(airPlanSec);
+}
+
+
+
+
+  const btn     = document.getElementById('mixBtn');
+  const nextBtn = document.getElementById('nextBtn');
+
+  const agStatus = document.getElementById('agStatus');
+  const airStatus= document.getElementById('airStatus');
+  const agEta    = document.getElementById('agEta');
+  const airEta   = document.getElementById('airEta');
+  const agFill   = document.getElementById('agFill');
+  const airFill  = document.getElementById('airFill');
+
+  function fmt(s){
+    s = Math.max(0, Math.round(s));
+    const m = Math.floor(s/60), ss = s % 60;
+    return m > 0 ? `${m}:${String(ss).padStart(2,'0')}` : `${ss}s`;
+  }
+
+  function startBar(which, plannedSeconds){
+    const statusEl = which === 'ag' ? agStatus : airStatus;
+    const etaEl    = which === 'ag' ? agEta    : airEta;
+    const fillEl   = which === 'ag' ? agFill   : airFill;
+
+    if (plannedSeconds <= 0){
+      statusEl.textContent = 'Disabled';
+      etaEl.textContent = '—';
+      fillEl.classList.add('done');
+      fillEl.style.width = '100%';
+      return { stop: ()=>{} };
+    }
+
+    statusEl.textContent = 'Running';
+    const startTS = performance.now()/1000;
+    let timer = setInterval(()=>{
+      const elapsed = (performance.now()/1000) - startTS;
+      const left = Math.max(0, plannedSeconds - elapsed);
+      const pct  = Math.min(100, (elapsed / plannedSeconds) * 100);
+      etaEl.textContent = fmt(left);
+      fillEl.style.width = pct + '%';
+      if (left <= 0){
+        clearInterval(timer);
+        statusEl.textContent = 'Done';
+        fillEl.classList.add('done');
+        fillEl.style.width = '100%';
+        maybeEnableNext();
+      }
+    }, 200);
+
+    return {
+      stop: ()=>{ try{ clearInterval(timer); }catch(e){} }
+    };
+  }
+
+  function maybeEnableNext(){
+    const allDone =
+      (agPlanSec <= 0 || agStatus.textContent === 'Done') &&
+      (airPlanSec <= 0 || airStatus.textContent === 'Done');
+    if (allDone){
+      nextBtn.style.display = '';
+    }
+  }
+
+  btn.addEventListener('click', ()=>{
+    btn.classList.add('is-running');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Running…';
+
+    const agCtl  = startBar('ag', agPlanSec);
+    const airCtl = startBar('air', airPlanSec);
+
+    // Fire-and-forget the server action; UI timers run immediately from plan.
+    fetch('{{ url_for("reservoirs.api_reservoirs_mix") }}', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({})
+    }).catch(()=>{}).finally(()=>{
+      // when request completes naturally, allow Next if both done
+      maybeEnableNext();
+      // revert the run button state (visual)
+      setTimeout(()=>{
+        btn.classList.remove('is-running');
+        btn.innerHTML = '<i class="fa-solid fa-water"></i> Mix and aerate reservoir';
+      }, 300);
+    });
+  });
+
+  // live clock badge (same behaviour as Step 3)
+  const liveStamp = document.getElementById('liveStamp');
+  function tickLabel(){
+    const d = new Date();
+    if (liveStamp) liveStamp.textContent = 'live • ' + d.toLocaleTimeString();
+  }
+  setInterval(tickLabel, 1000); tickLabel();
+</script>
+</body>
+</html>
+
+

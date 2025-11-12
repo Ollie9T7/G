@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Edit Grow Profile</title>
+
+  <!-- fonts & icons -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Open+Sans:ital,wght@0,300..800;1,300..800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root{
+    --bg:#0b0f14; --card:#121925; --muted:#2a3950; --text:#e7eef7; --sub:#e7eef7; --hint:#9bb4d3;
+    --brand:#1e5cff;
+    --label-col: 280px; /* label column width on desktop */
+    --radius: 8px;
+    --pad: 14px;
+    --section-gap: 26px; /* space between fieldsets */
+    --w: 850px; /* unify content width with other pages */
+  }
+  *,*::before,*::after{ box-sizing: border-box; }
+  html,body{height:100%; margin:0; padding:0;}
+  body {
+    font-family: system-ui, -apple-system, Segoe UI, Roboto, 'Open Sans', sans-serif;
+    background: var(--bg); color: var(--text);
+  }
+
+  /* Constrain the included header (header2.html) to page width without changing its look */
+  header, .header2, .site-header, nav.header, nav.top, .topnav {
+    max-width: var(--w);
+    margin: 0 auto;
+    padding: 0 var(--pad);
+  }
+
+  .container {
+    /* was: width: min(850px, 92vw); margin: 28px auto 64px; padding-bottom:50px; */
+    max-width: var(--w);
+    width: 100%;
+    margin: 28px auto 64px;
+    padding: 0 var(--pad) 50px; /* add side padding for mobile */
+  }
+
+  /* Top brand bar (matches Global Settings header) */
+  .brandbar { width:100%; background:#0b0f14; padding:15px 0; border-bottom:1px solid #282828; }
+  .brandbar-inner {
+    /* was: width:850px; margin:0 auto; */
+    max-width: var(--w);
+    margin: 0 auto;
+    padding: 0 var(--pad);
+    display:flex; justify-content:space-between; align-items:center;
+    font-family: 'Open Sans', sans-serif;
+  }
+  .brandbar a.live {
+    font-size:13px; font-weight:500; padding:8px 16px; background:#ADFB13; color:#121212;
+    border:none; border-radius:4px; text-decoration:none;
+  }
+
+  /* Header row (back + title on left, actions on right) */
+  .header {
+    display:flex; align-items:center; justify-content:space-between; gap:12px;
+    margin: 0 0 24px 0;
+    flex-wrap: wrap; /* allow wrapping on small screens to prevent overflow */
+  }
+  .header-left { display:flex; align-items:center; gap:12px; }
+  .header h1 { margin:0; font-size:24px; font-weight:600; }
+
+  .nav, button, .btn {
+    padding: 10px 14px; border-radius: var(--radius); border: 1px solid var(--muted); font-size:13px;
+    background: var(--card); color: #ddd; text-decoration: none; cursor: pointer; display:inline-block;
+  }
+  button, .btn.primary { background: var(--brand); color:#fff; border:none!important; }
+
+  form { display:grid; gap: var(--section-gap); }
+
+  fieldset {
+    border:1px solid var(--muted); border-radius: var(--radius); padding: var(--pad);
+    background: var(--card);
+  }
+  legend { color: var(--sub); padding: 0 6px; }
+
+  /* label / input rows */
+  .row {
+    display:grid; grid-template-columns: var(--label-col) 1fr;
+    gap:12px; align-items:center; margin:8px 0;
+  }
+  .row > *:last-child { min-width:0; }
+
+  label { color:#e7eef7; line-height:1.2; }
+  input, textarea {
+    width:100%; max-width:100%; padding:10px 12px; border-radius:10px;
+    border:1px solid var(--muted); background:#0d1420; color:#e7eef7; font-size:14px;
+  }
+  input[type="number"]{ font-variant-numeric: tabular-nums; }
+  textarea{ min-height:140px; resize:vertical; }
+
+  .hint { color: var(--hint); font-size:12px; margin-top:6px; }
+
+  .btnbar { display:flex; gap:10px; justify-content:flex-start; }
+  .btnbar.right { justify-content:flex-end; }
+
+  /* secondary links bar (kept, but match width/padding to page) */
+  .auxbar { width:100%; background:#0b0f14; padding:8px 0; border-bottom:1px solid #182135; }
+  .auxbar-inner {
+    /* was: width:850px; margin:0 auto; */
+    max-width: var(--w);
+    margin: 0 auto;
+    padding: 0 var(--pad);
+    display:flex; justify-content:space-between; align-items:center;
+  }
+  .aux-links a { font-size:13px; color:#9bb4d3; text-decoration:underline; margin-right:12px; }
+
+  /* Responsive tweaks (no visual change on desktop) */
+  @media (max-width: 700px){
+    .btnbar { flex-wrap: wrap; } /* avoid overflow of top-right buttons */
+  }
+  @media (max-width: 640px){
+    .row { grid-template-columns: 1fr; }
+    :root{ --label-col: 100%; }
+  }
+  
+  /* Keep header layout stable on this page */
+.hdr-bar .hdr-inner { display:flex; align-items:center; flex-wrap:wrap; gap:10px; }
+
+/* Left side can wrap and use leftover space */
+.hdr-bar .links-left { flex: 1 1 auto; min-width: 0; }
+
+/* Right side stays intact, no shrinking */
+.hdr-bar .links-right,
+.hdr-bar .mobile-trigger { flex: 0 0 auto; }
+
+/* Dropdown groups shouldn't shrink either */
+.hdr-bar .nav-dropdown,
+.hdr-bar .nav-dropbtn { flex: 0 0 auto; }
+
+/* Keep the “Sound alerts” label as a single, non-shrinking unit */
+.hdr-bar .nav-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+  flex: 0 0 auto;
+}
+.hdr-bar .nav-link input[type="checkbox"] {
+  flex: 0 0 auto;
+  width: auto;
+  height: auto;
+  margin: 0 6px 0 0;
+}
+
+/* Optional: at tight widths, reduce side padding a touch so both groups fit */
+@media (max-width: 900px){
+  .hdr-inner { padding: 0 12px; }
+}
+
+  .page-description {
+  margin: 0 0 28px 0;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--hint);
+}
+
+
+</style>
+
+
+
+
+</head>
+<body>
+
+  <!-- HEADER -->
+  {% include "header2.html" %}
+
+
+
+  <div class="container">
+    <!-- Page header with back + top actions -->
+    <div class="header">
+      <div class="header-left">
+        <a class="nav" href="/profiles">← Back</a>
+        <h1>Edit Grow Profile: {{ profile.get('name','') }}</h1>
+      </div>
+      <div class="btnbar">
+        <!-- Top actions submit the same form -->
+        <button type="submit" form="edit-profile-form">Save changes</button>
+        <a class="nav" href="/profiles">Cancel</a>
+      </div>
+    </div>
+
+            <!-- Page description -->
+<div class="page-description">
+  <p>
+    Edit the settings for this grow profile to adjust its behaviour. You can update lighting 
+    schedules, irrigation cycles, temperature and humidity ranges, and other targets. 
+    Changes you save here will overwrite the current version of the profile and apply 
+    the next time it is run. Use this page to fine-tune or correct existing profiles 
+    without having to create a new one.
+
+
+
+  </p>
+</div>
+
+    <form id="edit-profile-form" method="POST">
+      <!-- Profile Details -->
+      <fieldset>
+        <legend>Profile Details</legend>
+        <div class="row">
+          <label for="name">Profile Name</label>
+          <input id="name" type="text" name="name" value="{{ profile.get('name','') }}" required>
+        </div>
+      </fieldset>
+
+      <!-- Lighting -->
+      <fieldset>
+        <legend>Lighting</legend>
+        <div class="row">
+          <label for="light_on">On Time (hour 0–23)</label>
+          <input id="light_on" type="number" name="light_on" min="0" max="23"
+                 value="{{ profile.get('lighting', {}).get('on', '') }}" required>
+        </div>
+        <div class="row">
+          <label for="light_off">Off Time (hour 0–23)</label>
+          <input id="light_off" type="number" name="light_off" min="0" max="23"
+                 value="{{ profile.get('lighting', {}).get('off', '') }}" required>
+        </div>
+        <div class="row">
+          <label for="light_intensity">Intensity (%)</label>
+          <input id="light_intensity" type="number" name="light_intensity" min="0" max="100" step="1"
+                 value="{{ profile.get('lighting', {}).get('intensity', '') }}" required>
+        </div>
+      </fieldset>
+
+      <!-- Water Pump -->
+      <fieldset>
+        <legend>Water Pump</legend>
+        <div class="row">
+          <label for="pump_on_time">On Time (hour 0–23)</label>
+          <input id="pump_on_time" type="number" name="pump_on_time" min="0" max="23"
+                 value="{{ profile.get('pump', {}).get('on_time', '') }}" required>
+        </div>
+        <div class="row">
+          <label for="pump_off_time">Off Time (hour 0–23)</label>
+          <input id="pump_off_time" type="number" name="pump_off_time" min="0" max="23"
+                 value="{{ profile.get('pump', {}).get('off_time', '') }}" required>
+        </div>
+        <div class="row">
+          <label for="pump_duration_on">Duration On (minutes)</label>
+          <input id="pump_duration_on" type="number" step="0.1" min="0" name="pump_duration_on"
+                 value="{{ profile.get('pump', {}).get('duration_on', '') }}" required>
+        </div>
+        <div class="row">
+          <label for="pump_duration_off">Duration Off (minutes)</label>
+          <input id="pump_duration_off" type="number" step="0.1" min="0" name="pump_duration_off"
+                 value="{{ profile.get('pump', {}).get('duration_off', '') }}" required>
+        </div>
+      </fieldset>
+
+      <!-- Temperature -->
+      <fieldset>
+        <legend>Temperature</legend>
+        <div class="row">
+          <label for="temp_min">Min (°C)</label>
+          <input id="temp_min" type="number" name="temp_min" step="0.1"
+                 value="{{ profile.get('temperature', {}).get('min', '') }}" required>
+        </div>
+        <div class="row">
+          <label for="temp_max">Max (°C)</label>
+          <input id="temp_max" type="number" name="temp_max" step="0.1"
+                 value="{{ profile.get('temperature', {}).get('max', '') }}" required>
+        </div>
+        <div class="row">
+          <label for="temp_target">Target (°C)</label>
+          <input id="temp_target" type="number" name="temp_target" step="0.1"
+                 value="{{ profile.get('temperature', {}).get('target', '') }}" required>
+        </div>
+      </fieldset>
+
+      <!-- Humidity -->
+      <fieldset>
+        <legend>Humidity</legend>
+        <div class="row">
+          <label for="hum_min">Min (%)</label>
+          <input id="hum_min" type="number" name="hum_min" step="0.1"
+                 value="{{ profile.get('humidity', {}).get('min', '') }}" required>
+        </div>
+        <div class="row">
+          <label for="hum_max">Max (%)</label>
+          <input id="hum_max" type="number" name="hum_max" step="0.1"
+                 value="{{ profile.get('humidity', {}).get('max', '') }}" required>
+        </div>
+        <div class="row">
+          <label for="hum_target">Target (%)</label>
+          <input id="hum_target" type="number" name="hum_target" step="0.1"
+                 value="{{ profile.get('humidity', {}).get('target', '') }}" required>
+        </div>
+      </fieldset>
+      
+      <!-- Nutrients -->
+      <fieldset>
+        <legend>Nutrients — dilution rules</legend>
+
+        <!-- Pump A -->
+        <div class="row">
+          <label for="nutrient_A_ml">Pump A — ml</label>
+          <input id="nutrient_A_ml" type="number" step="0.01" min="0" name="nutrient_A_ml"
+            value="{{ (profile.get('nutrients', {}).get('A', {}).get('ml') if profile else '') }}">
+        </div>
+        <div class="row">
+          <label for="nutrient_A_per_l">Pump A — per litres</label>
+          <input id="nutrient_A_per_l" type="number" step="0.01" min="0" name="nutrient_A_per_l"
+            value="{{ (profile.get('nutrients', {}).get('A', {}).get('per_litres') if profile else '') }}">
+        </div>
+
+        <!-- Pump B -->
+        <div class="row">
+          <label for="nutrient_B_ml">Pump B — ml</label>
+          <input id="nutrient_B_ml" type="number" step="0.01" min="0" name="nutrient_B_ml"
+            value="{{ (profile.get('nutrients', {}).get('B', {}).get('ml') if profile else '') }}">
+        </div>
+        <div class="row">
+          <label for="nutrient_B_per_l">Pump B — per litres</label>
+          <input id="nutrient_B_per_l" type="number" step="0.01" min="0" name="nutrient_B_per_l"
+            value="{{ (profile.get('nutrients', {}).get('B', {}).get('per_litres') if profile else '') }}">
+        </div>
+
+        <p class="hint">
+          Enter dilution as “X ml per Y litres”. We’ll calculate total ml for the reservoir, then convert to seconds using each pump’s ml/s calibration.
+        </p>
+      </fieldset>
+
+
+
+
+      <!-- pH -->
+      <fieldset>
+        <legend>pH</legend>
+        <div class="row">
+          <label for="ph_min">Min pH</label>
+          <input id="ph_min" type="number" name="ph_min" step="0.1"
+                 value="{{ profile.get('ph', {}).get('min', '') }}" required>
+        </div>
+        <div class="row">
+          <label for="ph_max">Max pH</label>
+          <input id="ph_max" type="number" name="ph_max" step="0.1"
+                 value="{{ profile.get('ph', {}).get('max', '') }}" required>
+        </div>
+      </fieldset>
+
+      <!-- Notes -->
+      <fieldset>
+        <legend>Notes</legend>
+        <div class="row" style="grid-template-columns: 1fr;">
+          <label for="notes">Notes</label>
+          <textarea id="notes" name="notes">{{ profile.get('notes','') }}</textarea>
+        </div>
+      </fieldset>
+
+      <!-- Bottom buttons (right-aligned to match Global Settings) -->
+      <div class="btnbar right">
+        <button type="submit">Save changes</button>
+        <a class="nav" href="/profiles">Cancel</a>
+      </div>
+    </form>
+  </div>
+</body>
+</html>
+
+
+

@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Archived Profiles</title>
+
+  <!-- fonts & icons -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Open+Sans:ital,wght@0,300..800;1,300..800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+
+  <!-- responsive -->
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <style>
+    :root{
+      --bg:#0b0f14; --card:#121925; --muted:#2a3950; --text:#e7eef7; --sub:#e7eef7; --hint:#9bb4d3;
+      --brand:#1e5cff;
+      --radius: 8px;
+      --pad: 14px;
+      --section-gap: 26px;
+      --w: 850px;
+
+      /* archive accents */
+      --archive-accent:#7a879b;   /* desaturated slate for chips/icons */
+      --archive-stripe:#0f1724;   /* stripe background */
+      --archive-edge:#324156;     /* left-edge accent */
+      --restore-accent:#ADFB13;   /* restore = same green as system */
+    }
+
+    /* reset */
+    *, *::before, *::after { box-sizing: border-box; }
+    html,body{height:100%; margin:0; padding:0;}
+    body{
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, 'Open Sans', sans-serif;
+      background: var(--bg); color: var(--text);
+    }
+
+    /* Constrain shared header include */
+    header, .header2, .site-header, nav.header, nav.top, .topnav {
+      max-width: var(--w);
+      margin: 0 auto;
+      padding: 0 var(--pad);
+    }
+
+    /* container */
+    .main-container{
+      max-width: var(--w);
+      margin: 28px auto 64px;
+      padding: 0 var(--pad) 50px;
+    }
+
+    h1{ font-size:24px; font-weight:600; margin:0 0 10px 0; }
+    p.lede{
+      margin:0 0 18px 0; color:var(--hint); font-size:13px;
+    }
+    h2{ font-size:14px; font-weight:700; margin:28px 0 10px 0; text-transform:uppercase; color:var(--sub); }
+
+    /* list/cards */
+    .list{
+      border:1px solid var(--muted);
+      border-radius: var(--radius);
+      overflow: visible;
+      background: var(--card);
+      margin-top:12px;
+    }
+    .row{
+      position:relative;
+      display:flex; align-items:center; justify-content:space-between; gap:10px;
+      padding:12px 14px; border-bottom:1px solid var(--muted);
+      flex-wrap: wrap;
+      /* subtle archive diagonal texture */
+      background:
+        repeating-linear-gradient(
+          -45deg,
+          var(--archive-stripe),
+          var(--archive-stripe) 6px,
+          transparent 6px,
+          transparent 12px
+        );
+    }
+    .row:last-child{ border-bottom:none; }
+
+    /* left-edge accent to differentiate from active profiles page */
+    .row::before{
+      content:"";
+      position:absolute; left:0; top:0; bottom:0;
+      width:4px; border-top-left-radius:var(--radius); border-bottom-left-radius:var(--radius);
+      background: var(--archive-edge);
+    }
+
+    .row-left{ display:flex; align-items:center; gap:10px; font-weight:600; color:var(--text); }
+
+    /* chips */
+    .chip{
+      font-size:12px; font-weight:700; padding:4px 8px; border-radius:999px;
+      border:1px solid var(--muted);
+    }
+    .chip-archived{
+      background:#0d1420; color:#c3cada; border-color:#2a3950;
+    }
+
+    /* right-aligned controls */
+    .row-right{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+    .row-right form{ margin:0; }
+
+    /* buttons */
+    .btn{
+      display:inline-flex; align-items:center; gap:6px; font-size:13px; font-weight:600;
+      padding:10px 14px; border-radius: var(--radius); border:1px solid var(--muted);
+      background: var(--card); color:#ddd; text-decoration:none; cursor:pointer;
+      transition: filter .12s ease-in-out;
+    }
+    .btn:hover{ filter:brightness(0.95); }
+
+    .btn-quiet-blue  { background: var(--card); color:#cde4ff; border-color:#2a3950; }
+    .btn-quiet-green { background: var(--card); color:#1b2; border-color:#2a3950; }
+    /* force restore to use the bright system green for clear affordance */
+    .btn-restore {
+      color:#121212; background:var(--restore-accent); border-color:var(--restore-accent);
+    }
+
+    /* archive icon tone */
+    .arch-icon{
+      width:28px; height:28px; display:grid; place-items:center;
+      border-radius:6px; border:1px solid var(--muted); background:#0d1420; color:var(--archive-accent);
+      margin-right:2px;
+    }
+
+    /* empty state */
+    .empty{
+      background:#0d1420; border:1px solid var(--muted); color:var(--hint);
+      padding:12px 14px; border-radius: var(--radius);
+    }
+
+    /* helper: subtle divider above list */
+    .section { margin-top: 6px; }
+  </style>
+</head>
+
+<body>
+  <!-- HEADER -->
+  {% include "header2.html" %}
+
+  <!-- MAIN -->
+  <div class="main-container">
+    <h1>Archived Profiles</h1>
+    <p class="lede">
+      Profiles shown here are removed from active use. You can edit their settings or restore them back to your Profiles list.
+    </p>
+
+    {% if archived_profiles|length == 0 %}
+      <div class="empty">No archived profiles.</div>
+    {% else %}
+      <div class="list section">
+        {% for profile in archived_profiles %}
+          <div class="row">
+            <div class="row-left">
+              <span class="arch-icon" aria-hidden="true"><i class="fa-solid fa-box-archive"></i></span>
+              {{ profile }}
+              <span class="chip chip-archived">Archived</span>
+            </div>
+            <div class="row-right">
+              <a href="/archive/edit/{{ profile }}" class="btn btn-quiet-blue">
+                <i class="fa-solid fa-pen-to-square"></i> Edit
+              </a>
+              <form action="/restore/{{ profile }}" method="POST">
+                <button type="submit" class="btn btn-restore">
+                  <i class="fa-solid fa-rotate-left"></i> Restore
+                </button>
+              </form>
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+    {% endif %}
+    <div style="text-align:left; margin-top:20px; padding-top:20px; border-top:1px solid #2a3950;">
+  <a href="/profiles" class="btn btn-quiet-blue">
+    <i class="fa-solid fa-heart"></i> View Active Profiles
+  </a>
+</div>
+  </div>
+</body>
+</html>
+
+
+

@@ -1,0 +1,359 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Reservoir Renewal Wizard</title>
+
+  <!-- fonts & icons -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Open+Sans:ital,wght@0,300..800;1,300..800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <style>
+    /* Base + theme to match your Scale page */
+    html, body { margin:0; padding:0; }
+    *, *::before, *::after { box-sizing: border-box; }
+    :root {
+      --w: 850px; --pad: 16px; --gap: 14px; --br: 10px;
+      --ink:#e7eef7; --muted:#aac2de; --hint:#9bb4d3;
+      --bg:#0b0f14; --card:#121925; --border:#243247; --well:#0d1420; --well2:#1e2a3a;
+      --ok:#7bd88f; --warn:#f7c948; --bad:#ff7b7b;
+    }
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; background:var(--bg); color:var(--ink); }
+    .wrap { max-width: var(--w); margin: 28px auto; padding: 0 var(--pad); }
+
+    /* Constrain your global header like other pages (no style change to header itself) */
+    header, .header, .site-header, nav.header, nav.top, .topnav {
+      max-width: var(--w);
+      margin: 0 auto;
+      padding: 0 var(--pad);
+    }
+
+    .topbar { display:flex; align-items:center; gap:12px; margin-bottom:18px; }
+    .btn { background:var(--well2); color:var(--ink); border:1px solid #2a3950; padding:10px 14px; border-radius:10px; cursor:pointer; text-decoration:none; font-weight:600; display:inline-flex; align-items:center; gap:8px; }
+    .btn:disabled { opacity:.55; cursor:not-allowed; }
+    .btn:active { transform: translateY(1px); }
+    h1 { font-size:22px; margin:0; }
+
+    .step { background:var(--card); border:1px solid var(--border); border-radius:14px; padding:18px; margin-bottom:14px; box-shadow:0 1px 2px rgba(0,0,0,.08); }
+    .h { font-size:20px; font-weight:800; margin:0 0 8px; }
+    .p { color:var(--hint); margin:6px 0 12px; }
+    .row { display:flex; gap:16px; align-items:flex-end; flex-wrap:wrap; }
+
+    .progress { width:100%; height:14px; background:#0f1722; border:1px solid #22324a; border-radius:999px; overflow:hidden; }
+    .progress > div { height:100%; width:0; transition: width .1s linear; background:linear-gradient(90deg,#45c9a5,#7ae36a); }
+
+    .fine { width:100%; height:32px; background:#0f1722; border:1px solid #22324a; border-radius:999px; position:relative; overflow:hidden; margin-top:8px; }
+    .fine .sweet { position:absolute; left:50%; top:0; transform:translateX(-50%); height:100%; width:18%; background:rgba(123,216,143,.18); border-left:1px solid rgba(123,216,143,.6); border-right:1px solid rgba(123,216,143,.6); }
+    .fine .slider { position:absolute; top:0; width:2px; height:100%; background:#e7eef7; box-shadow:0 0 6px rgba(231,238,247,.35); }
+
+    input, select {
+      border:1px solid #2a3950; background:var(--well); color:var(--ink);
+      border-radius:10px; padding:10px 12px; font-size:14px; outline:none;
+    }
+    input::placeholder { color:#6b85a6; }
+    select { min-width:240px; }
+
+    .kv { display:flex; gap:16px; flex-wrap:wrap; color:var(--hint); }
+    .kv span { color:var(--ink); font-weight:700; }
+    hr { border:none; border-top:1px solid var(--border); margin:12px 0; }
+    .badge { display:inline-block; background:var(--well); color:#9ec1ff; border:1px solid #2a3950; padding:4px 8px; border-radius:999px; font-size:12px; }
+
+    .small { font-size:13px; color:var(--hint); }
+
+    @media (max-width: 700px) {
+      .topbar { flex-wrap:wrap; }
+      .row { flex-direction:column; align-items:stretch; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- HEADER -->
+  {% include "header2.html" %}
+
+  <div class="wrap">
+    <div class="topbar">
+      <a class="btn" href="{{ url_for('reservoirs.reservoirs_page') }}">← Back</a>
+      <h1>Reservoir Renewal Wizard</h1>
+      <span class="badge">live</span>
+    </div>
+
+    <!-- Step 1 -->
+    <div class="step" id="s1">
+      <div class="h">Step 1 · Empty the reservoir</div>
+      <p class="p">Please ensure the main reservoir is fully empty (remove any remaining water and all of the pumps) before proceeding.</p>
+      <button class="btn" id="s1-next"><i class="fa fa-check"></i> Yes, it is empty</button>
+    </div>
+
+    <!-- Step 2 -->
+    <div class="step" id="s2" style="display:none">
+      <div class="h">Step 2 · Add water</div>
+      <div class="kv">
+        <div>Target: <span id="tgt-liters">–</span> L</div>
+        <div>Remaining: <span id="rem-liters">–</span> L</div>
+      </div>
+      <div class="row" style="width:100%">
+        <div class="progress" title="Overall fill to target"><div id="s2-bar"></div></div>
+        <div class="fine" title="Final litre sweet spot">
+          <div class="sweet"></div>
+          <div class="slider" id="s2-slider"></div>
+        </div>
+      </div>
+      <div class="p small">Top bar shows overall fill. Bottom bar shows the final 1 litre; aim for the green centre.</div>
+      <button class="btn" id="s2-next" disabled>Continue</button>
+    </div>
+
+    <!-- Step 3 -->
+    <div class="step" id="s3" style="display:none">
+      <div class="h">Step 3 · Select nutrient profile</div>
+      <p class="p">Choose the grow profile to calculate nutrient dosing from its <span class="badge">nutrients</span> section.</p>
+      <div class="row">
+        <select id="profile"></select>
+        <button class="btn" id="dose-run"><i class="fa fa-vial"></i> Run nutrient dosing</button>
+      </div>
+      <div class="kv" id="dose-summary" style="display:none; margin-top:10px">
+        <div>Will dose A: <span id="doseA">0</span> ml</div>
+        <div>Will dose B: <span id="doseB">0</span> ml</div>
+      </div>
+    </div>
+
+    <!-- Step 4 -->
+    <div class="step" id="s4" style="display:none">
+      <div class="h">Step 4 · Mix</div>
+      <p class="p">Run the agitator to mix nutrients thoroughly.</p>
+      <button class="btn" id="mix-run"><i class="fa fa-water"></i> Run mixing</button>
+      <div class="p" id="mix-done" style="display:none">Mix complete.</div>
+    </div>
+
+    <!-- Step 5 -->
+    <div class="step" id="s5" style="display:none">
+      <div class="h">Step 5 · Finish</div>
+      <p class="p">Save and return to the Reservoir management page.</p>
+      <button class="btn" id="finish"><i class="fa fa-flag-checkered"></i> Complete setup</button>
+    </div>
+
+    <hr>
+
+    <!-- Calibration panel (A/B) -->
+    <div class="step">
+      <div class="h">Nutrient pumps calibration</div>
+      <p class="p">Prime lines (instant on/off), then run a timed test and enter the measured ml to learn ml/s.</p>
+
+      <div class="row">
+        <div style="min-width:280px">
+          <div class="badge">Pump A</div><br>
+          <div style="height:8px"></div>
+          <button class="btn" data-prime="A" data-on="1">Prime A ON</button>
+          <button class="btn" data-prime="A" data-on="0">Prime A OFF</button>
+          <div style="height:8px"></div>
+          <input id="A-sec" type="number" min="0" step="0.1" placeholder="Seconds (e.g. 10)">
+          <button class="btn" data-run="A">Run A for seconds</button>
+          <div style="height:8px"></div>
+          <input id="A-ml" type="number" min="0" step="0.1" placeholder="Measured ml">
+          <button class="btn" data-calc="A">Save A calibration</button>
+        </div>
+
+        <div style="min-width:280px">
+          <div class="badge">Pump B</div><br>
+          <div style="height:8px"></div>
+          <button class="btn" data-prime="B" data-on="1">Prime B ON</button>
+          <button class="btn" data-prime="B" data-on="0">Prime B OFF</button>
+          <div style="height:8px"></div>
+          <input id="B-sec" type="number" min="0" step="0.1" placeholder="Seconds (e.g. 10)">
+          <button class="btn" data-run="B">Run B for seconds</button>
+          <div style="height:8px"></div>
+          <input id="B-ml" type="number" min="0" step="0.1" placeholder="Measured ml">
+          <button class="btn" data-calc="B">Save B calibration</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+  (function(){
+    const $ = s=>document.querySelector(s);
+    const get = async (url) => (await fetch(url,{cache:'no-store'})).json();
+    const post = async (url, body) => (await fetch(url,{method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body||{})})).json();
+
+    // --- Step state ---
+    let targetLitres = null;
+    let filledLitres = null;
+    let chosenProfile = null;
+    let profiles = [];
+
+    const LIVE_URL   = '/api/reservoirs/live';
+    const DOSE_URL   = '/api/reservoirs/dose';
+    const MIX_URL    = '/api/reservoirs/mix';
+    const FINISH_URL = '/api/reservoirs/complete';
+
+    const PRIME_URL  = '/api/nutrient/prime';
+    const RUN_URL    = '/api/nutrient/run';
+    const CALC_URL   = '/api/nutrient/calc';
+
+    // Optional profiles endpoint inside the same blueprint (prefer local if present)
+    const PROFILES_URLS = ['/api/reservoirs/profiles','/api/profiles/list'];
+
+    async function live(){ return await get(LIVE_URL); }
+
+    // Poll during Step 2 for fast gauges
+    let s2Timer = null;
+    function startStep2Poll(){
+      stopStep2Poll();
+      s2Timer = setInterval(async ()=>{
+        try{
+          const j = await live();
+          const main = j.main||{};
+          const pct = main.percent||0;
+          $('#s2-bar').style.width = pct+'%';
+
+          const fine = main.fine||{};
+          const pos01 =
+            (typeof fine === 'number')
+              ? Math.max(0, Math.min(1, fine))
+              : Math.max(0, Math.min(1, fine.pos_kg||0));
+          $('#s2-slider').style.left = (pos01*100)+'%';
+
+          const remain = main.litres_to_go;
+          $('#rem-liters').textContent = (remain ?? '–');
+
+          filledLitres = (targetLitres!=null && remain!=null) ? Math.max(0, (targetLitres - remain)) : null;
+
+          // enable continue when within sweet spot (~center 0.41..0.59)
+          const sweetVal = (typeof fine === 'number') ? fine : (fine.pos_kg);
+          const inSweet = (sweetVal!=null) && (sweetVal > 0.41 && sweetVal < 0.59);
+          $('#s2-next').disabled = !inSweet;
+        }catch(e){}
+      }, 200);
+    }
+    function stopStep2Poll(){ if(s2Timer){ clearInterval(s2Timer); s2Timer=null; } }
+
+    async function loadProfiles(){
+      for (const u of PROFILES_URLS) {
+        try {
+          const j = await get(u);
+          if (j && (j.profiles || j.items)) {
+            return j.profiles || j.items || [];
+          }
+        } catch(e) { /* try next */ }
+      }
+      return [];
+    }
+
+    // --- Step navigation ---
+    $('#s1-next').addEventListener('click', async ()=>{
+      // Fetch target_litres from a settings endpoint if present, else infer via live()
+      try{
+        const rs = await get('/api/settings'); // if available
+        targetLitres = parseFloat(rs.reservoir_target_liters)||0;
+      }catch(e){
+        // fallback: try to infer from live remain + percent (best-effort)
+        targetLitres = null;
+      }
+      $('#tgt-liters').textContent = (targetLitres ?? '—');
+
+      $('#s1').style.display='none';
+      $('#s2').style.display='';
+      startStep2Poll();
+    });
+
+    $('#s2-next').addEventListener('click', async ()=>{
+      stopStep2Poll();
+      $('#s2').style.display='none';
+      $('#s3').style.display='';
+
+      // Load profiles for dosing
+      profiles = await loadProfiles();
+      const sel = $('#profile');
+      sel.innerHTML = '';
+      if(!profiles.length){
+        const o = document.createElement('option');
+        o.textContent = 'No profiles found';
+        o.value = '';
+        sel.appendChild(o);
+      }else{
+        profiles.forEach(p=>{
+          const o = document.createElement('option');
+          o.textContent = p.name || p.id || 'Profile';
+          o.value = p.id || p.name;
+          o.dataset.payload = JSON.stringify(p);
+          sel.appendChild(o);
+        });
+      }
+    });
+
+    $('#dose-run').addEventListener('click', async ()=>{
+      const sel = $('#profile');
+      const opt = sel.selectedOptions[0];
+      if(!opt || !opt.dataset.payload){ return; }
+      chosenProfile = JSON.parse(opt.dataset.payload);
+
+      // Use filledLitres if we have it; else fall back to target
+      const litres = (filledLitres!=null) ? filledLitres : (targetLitres||0);
+
+      const j = await post(DOSE_URL, { profile: chosenProfile, filled_litres: litres });
+      if(j && j.dosed_ml){
+        $('#dose-summary').style.display='';
+        $('#doseA').textContent = j.dosed_ml.A || 0;
+        $('#doseB').textContent = j.dosed_ml.B || 0;
+
+        // advance
+        $('#s3').style.display='none';
+        $('#s4').style.display='';
+      }
+    });
+
+    $('#mix-run').addEventListener('click', async ()=>{
+      const j = await post(MIX_URL, {});
+      if(j && j.ok){
+        $('#mix-done').style.display='';
+        // show finish
+        $('#s4').style.display='none';
+        $('#s5').style.display='';
+      }
+    });
+
+    $('#finish').addEventListener('click', async ()=>{
+      const body = { profile_name: (chosenProfile && (chosenProfile.name||chosenProfile.id)) || null };
+      await post(FINISH_URL, body);
+      window.location.href = "{{ url_for('reservoirs.reservoirs_page') }}";
+    });
+
+    // Calibration controls
+    document.querySelectorAll('[data-prime]').forEach(btn=>{
+      btn.addEventListener('click', async ()=>{
+        const pump = btn.getAttribute('data-prime');
+        const on = btn.getAttribute('data-on') === '1';
+        await post(PRIME_URL, {pump, on});
+      });
+    });
+    document.querySelectorAll('[data-run]').forEach(btn=>{
+      btn.addEventListener('click', async ()=>{
+        const pump = btn.getAttribute('data-run');
+        const sec = parseFloat($('#'+pump+'-sec').value||'0');
+        if(sec>0){
+          await post(RUN_URL, {pump, seconds: sec});
+        }
+      });
+    });
+    document.querySelectorAll('[data-calc]').forEach(btn=>{
+      btn.addEventListener('click', async ()=>{
+        const pump = btn.getAttribute('data-calc');
+        const sec = parseFloat($('#'+pump+'-sec').value||'0');
+        const ml  = parseFloat($('#'+pump+'-ml').value||'0');
+        if(sec>0 && ml>0){
+          await post(CALC_URL, {pump, seconds: sec, measured_ml: ml});
+          alert('Calibration saved for pump '+pump);
+        }
+      });
+    });
+  })();
+  </script>
+</body>
+</html>
+
+
+

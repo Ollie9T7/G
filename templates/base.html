@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>{% block title %}Grow Controller{% endblock %}</title>
+
+    {% block head %}
+    <!-- Shared CSS file -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    {% endblock %}
+</head>
+<body>
+    <nav>
+        <a href="/">🏠 Home</a> |
+        <a href="/profiles">🌿 View Profiles</a> |
+        <a href="/new">➕ Create Profile</a>
+    </nav>
+    <hr>
+
+    {% block content %}{% endblock %}
+</body>
+</html>

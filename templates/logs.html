@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Logs</title>
+
+  <!-- fonts & icons -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <style>
+    :root{
+      --bg:#0b0f14; --card:#121925; --muted:#2a3950; --text:#e7eef7; --sub:#e7eef7; --hint:#9bb4d3;
+      --brand:#1e5cff; --radius:8px; --pad:14px; --w:850px;
+    }
+    *,*::before,*::after{box-sizing:border-box}
+    html,body{height:100%;margin:0;padding:0}
+    body{font-family:system-ui,-apple-system,Segoe UI,Roboto,'Open Sans',sans-serif;background:var(--bg);color:var(--text)}
+    header,.header2,.site-header,nav.header,nav.top,.topnav{max-width:var(--w);margin:0 auto;padding:0 var(--pad)}
+    .main-container{max-width:var(--w);margin:28px auto 64px;padding:0 var(--pad) 50px}
+    h1{font-size:24px;font-weight:600;margin:0 0 18px 0}
+    h2{font-size:12px;font-weight:700;margin:12px 0 6px 0;text-transform:uppercase;color:var(--sub);letter-spacing:.03em}
+    .card{border:1px solid var(--muted);border-radius:var(--radius);background:var(--card);padding:10px;margin-bottom:14px}
+    .filters{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+    .filters label{font-size:12px;color:var(--hint);margin-right:4px}
+    .filters input,.filters select{background:#0b111a;color:#e7eef7;border:1px solid var(--muted);border-radius:6px;padding:6px 8px;font-size:13px;outline:none}
+    .btn{display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:600;padding:8px 10px;border-radius:var(--radius);border:1px solid var(--muted);background:var(--card);color:#ddd;text-decoration:none;cursor:pointer}
+    .btn[disabled]{opacity:.55;cursor:not-allowed}
+    .btn-primary{background:#12318a;border-color:#1e5cff}
+    .chip{font-size:12px;font-weight:700;padding:4px 8px;border-radius:999px;border:1px solid var(--muted);background:#0d1420;color:#cde4ff;cursor:pointer;user-select:none}
+    .chip.active{outline:2px solid #1e5cff}
+    .day{margin-top:12px;border:1px solid var(--muted);border-radius:var(--radius);overflow:hidden}
+    .day-head{background:#0d1420;color:var(--sub);font-size:12px;font-weight:700;padding:8px 10px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--muted)}
+    .day-head .meta{color:var(--hint);font-weight:600;font-size:12px}
+    .list{border-top:0;background:var(--card)}
+    .row{display:grid;grid-template-columns:88px 1fr 1fr;gap:8px;align-items:center;padding:8px 10px;border-bottom:1px solid var(--muted);font-size:13px;line-height:1.2}
+    .row:last-child{border-bottom:none}
+    .time{color:var(--hint);white-space:nowrap}
+    .action{font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .reason{color:#cde4ff;opacity:.9;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .empty{background:#0d1420;border:1px solid var(--muted);color:var(--hint);padding:10px;border-radius:var(--radius)}
+    .controls-grid{ display:grid; grid-template-columns: 1fr; gap:12px; }
+    @media (min-width: 860px){ .controls-grid{ grid-template-columns: 1fr 1fr; } }
+    .section-title{
+      font-size:12px; font-weight:700; color:var(--sub); text-transform:uppercase; letter-spacing:.03em;
+      margin:0 0 8px 0; display:flex; align-items:center; gap:8px;
+    }
+    .subtle{ color:var(--hint); font-size:12px; }
+    .btn[data-loadmore-day]{ padding:6px 10px; font-size:12px; }
+  </style>
+</head>
+<body>
+  {% include "header2.html" %}
+  <div class="main-container">
+    <h1>Logs</h1>
+
+    <div class="controls-grid">
+      <div class="card">
+        <div class="section-title"><i class="fa-regular fa-filter"></i> Filters</div>
+        <div class="filters" style="margin-bottom:6px;">
+          <label for="day">Day</label>
+          <input type="date" id="day">
+          <span class="subtle">(pick a single day)</span>
+        </div>
+        <div class="filters">
+          <span id="chip-act"  class="chip active" data-type="actuator_change"><i class="fa-solid fa-toggle-on"></i> actuator</span>
+          <span id="chip-irr"  class="chip active" data-type="irrigation_cycle"><i class="fa-solid fa-droplet"></i> irrigation</span>
+          <!-- NEW: reservoir events chip -->
+          <span id="chip-res"  class="chip active" data-type="reservoir_renewal"><i class="fa-solid fa-water"></i> reservoir</span>
+          <span id="chip-alr"  class="chip active" data-type="alert"><i class="fa-solid fa-triangle-exclamation"></i> alert</span>
+          <span id="chip-prof" class="chip"          data-type="profile_lifecycle"><i class="fa-solid fa-leaf"></i> profile</span>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="section-title"><i class="fa-regular fa-layer-group"></i> Profile & Export</div>
+        <div class="filters" style="margin-bottom:6px;">
+          <label for="profileSel">Profile</label>
+          <select id="profileSel"><option value="">All profiles</option></select>
+
+          <label for="limitSel">Limit</label>
+          <select id="limitSel">
+            <option value="500">500</option>
+            <option value="1000" selected>1000</option>
+            <option value="2000">2000</option>
+          </select>
+        </div>
+
+        <div class="filters">
+          <button id="refreshBtn" class="btn"><i class="fa-solid fa-rotate-right"></i> Refresh</button>
+          <a id="csvDayBtn" class="btn btn-primary"><i class="fa-solid fa-file-csv"></i> Download day</a>
+          <a id="csvRunBtn" class="btn" title="Download the full current/last run of this profile"><i class="fa-solid fa-file-arrow-down"></i> Download full run</a>
+          <span class="subtle" style="margin-left:auto;">
+            <label>Showing</label> <span id="countInfo" style="color:var(--hint);font-weight:600;">0</span> (newest at top)
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <div id="daysContainer"></div>
+    <div id="empty" class="empty" style="display:none;">No events for this selection.</div>
+  </div>
+
+  <script>
+    // Elements
+    const dayEl = document.getElementById('day');
+    const profileSel = document.getElementById('profileSel');
+    const limitSel = document.getElementById('limitSel');
+    const refreshBtn = document.getElementById('refreshBtn');
+    const csvDayBtn = document.getElementById('csvDayBtn');
+    const csvRunBtn = document.getElementById('csvRunBtn');
+    const daysContainer = document.getElementById('daysContainer');
+    const emptyEl = document.getElementById('empty');
+    const countInfo = document.getElementById('countInfo');
+
+    const chips = Array.from(document.querySelectorAll('.chip'));
+    function selectedTypes(){
+      const on = chips.filter(c=>c.classList.contains('active')).map(c=>c.dataset.type);
+      // Include reservoir renewal events by default
+      return on.length ? on : ['actuator_change','irrigation_cycle','alert','reservoir_renewal'];
+    }
+    chips.forEach(c=>c.addEventListener('click', ()=>{ c.classList.toggle('active'); load(); }));
+
+    // Defaults
+    const todayISO = new Date().toISOString().slice(0,10);
+    dayEl.value = todayISO;
+
+    // --- Pagination (client-side) ---
+    const PAGE_SIZE = 30; // events per click
+    // pagingState[dayKey][profileId] = number of events currently shown
+    const pagingState = {};
+    let lastFilterKey = ''; // remember last filters so we only reset when they change
+
+    // Helpers
+    function esc(s){ if (s===null||s===undefined) return ''; return String(s).replace(/[&<>"']/g, m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
+    function fmtTime(ts){
+      const d = new Date((ts||'').replace(' ','T'));
+      if (isNaN(d)) return '';
+      return d.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+    }
+    function dayKeyFrom(ev){
+      const t = ev.ts_local || ev.ts_utc || '';
+      const d = new Date(t.replace(' ','T'));
+      if (isNaN(d)) return null;
+      return d.toISOString().slice(0,10);
+    }
+
+    // Fetch events
+    async function fetchEvents(limit){
+      const types = encodeURIComponent(selectedTypes().join(','));
+      const url = `/logs/api/events?limit=${encodeURIComponent(limit)}&types=${types}`;
+      const res = await fetch(url, { cache:'no-store' });
+      return res.json();
+    }
+
+    // Profile dropdown from events
+    function rebuildProfileDropdown(allEvents){
+      const set = new Set();
+      for (const e of allEvents){ if (e.profile_id) set.add(e.profile_id); }
+      const keep = profileSel.value;
+      profileSel.innerHTML = `<option value="">All profiles</option>` + Array.from(set).sort().map(p=>`<option value="${esc(p)}">${esc(p)}</option>`).join('');
+      if (set.has(keep)) profileSel.value = keep;
+    }
+
+    // Group by day then (optionally) by profile
+    function groupByDayAndProfile(items, selectedProfile){
+      const out = {};
+      for (const ev of items){
+        const dk = dayKeyFrom(ev);
+        if (!dk) continue;
+        if (!out[dk]) out[dk] = {};
+        const pid = ev.profile_id || '(none)';
+        if (selectedProfile && pid !== selectedProfile) continue;
+        (out[dk][pid] ||= []).push(ev);
+      }
+      return out;
+    }
+
+    // Detect latest run window (for “Download full run”)
+    function detectLatestRunWindow(events, profileId){
+      const lifecycles = events
+        .filter(e => e.event_type === 'profile_lifecycle' && e.profile_id === profileId)
+        .sort((a,b) => new Date((b.ts_local||b.ts_utc||'').replace(' ','T')) - new Date((a.ts_local||a.ts_utc||'').replace(' ','T')));
+
+      let start = null;
+      for (let i=0;i<lifecycles.length;i++){
+        const e = lifecycles[i];
+        if (e.reason_code === 'start'){
+          start = new Date((e.ts_local||e.ts_utc||'').replace(' ','T'));
+          for (let j=i-1;j<lifecycles.length;j++){
+            const f = lifecycles[j];
+            if (!f) break;
+            const ft = new Date((f.ts_local||f.ts_utc||'').replace(' ','T'));
+            if (ft < start && f.reason_code === 'stop'){
+              return { from: start, to: ft };
+            }
+          }
+          return { from: start, to: new Date() };
+        }
+      }
+      return null;
+    }
+
+    function ymd(d){ return d.toISOString().slice(0,10); }
+
+    function updateCsvLinks(selectedDay, selectedProfile, allEvents){
+      // Day CSV (exact single day)
+      const dayQS = selectedDay ? `from=${selectedDay}&to=${selectedDay}` : '';
+      const profQS = selectedProfile ? `&profile_id=${encodeURIComponent(selectedProfile)}` : '';
+      csvDayBtn.href = `/logs/api/export.csv?${dayQS}${profQS}&wide=1`;
+
+      // Full run CSV
+      if (!selectedProfile){
+        csvRunBtn.removeAttribute('href');
+        csvRunBtn.setAttribute('disabled','true');
+        return;
+      }
+      const win = detectLatestRunWindow(allEvents, selectedProfile);
+      if (!win){
+        csvRunBtn.removeAttribute('href');
+        csvRunBtn.setAttribute('disabled','true');
+        return;
+      }
+      const fromDay = ymd(win.from);
+      const toDay = ymd(win.to);
+      csvRunBtn.href = `/logs/api/export.csv?from=${encodeURIComponent(fromDay)}&to=${encodeURIComponent(toDay)}&profile_id=${encodeURIComponent(selectedProfile)}&wide=1`;
+      csvRunBtn.removeAttribute('disabled');
+    }
+
+    function renderDay(day, perProfile, selectedProfile){
+      const box = document.createElement('div');
+      box.className = 'day';
+
+      // pick which profiles to render (most-recent profile FIRST)
+      let keys;
+      if (selectedProfile) {
+        keys = [selectedProfile];
+      } else {
+        const latestTs = (events) => {
+          let max = 0;
+          for (const ev of events) {
+            const t = new Date((ev.ts_local || ev.ts_utc || '').replace(' ', 'T')).getTime();
+            if (!Number.isNaN(t) && t > max) max = t;
+          }
+          return max;
+        };
+        keys = Object.entries(perProfile)
+          .sort(([, evsA], [, evsB]) => latestTs(evsB) - latestTs(evsA))
+          .map(([pid]) => pid);
+      }
+
+      let total = 0;
+      keys.forEach(k => total += (perProfile[k]?.length || 0));
+
+      const head = document.createElement('div');
+      head.className = 'day-head';
+      head.innerHTML = `<span><i class="fa-regular fa-calendar"></i> ${esc(day)}</span>
+                        <span class="meta">${total} events</span>`;
+      box.appendChild(head);
+
+      keys.forEach(pid => {
+        const rows = (perProfile[pid] || []).slice();
+        if (!rows.length) return;
+
+        if (!selectedProfile){
+          const h = document.createElement('h2');
+          h.textContent = pid;
+          box.appendChild(h);
+        }
+
+        // Sort DESC so newest first (oldest at bottom)
+        rows.sort((a,b) => new Date((b.ts_local||b.ts_utc||'').replace(' ','T')) - new Date((a.ts_local||a.ts_utc||'').replace(' ','T')));
+
+        // --- pagination bookkeeping for this (day, profile) ---
+        pagingState[day] ||= {};
+        const shown = Math.min(
+          pagingState[day][pid] || PAGE_SIZE,
+          rows.length
+        );
+        pagingState[day][pid] = shown;
+
+        const list = document.createElement('div');
+        list.className = 'list';
+
+        // Render only the visible slice
+        rows.slice(0, shown).forEach(ev => {
+          const r = document.createElement('div');
+          r.className = 'row';
+          const t = fmtTime(ev.ts_local || ev.ts_utc);
+          const action = ev.msg || ev.event_type;
+          const reason = ev.reason_code || '';
+          r.innerHTML = `
+            <div class="time">${esc(t)}</div>
+            <div class="action">${esc(action)}</div>
+            <div class="reason">${esc(reason)}</div>
+          `;
+          list.appendChild(r);
+        });
+        box.appendChild(list);
+
+        // If there are more rows, add a "Load more" control
+        if (shown < rows.length) {
+          const moreBtn = document.createElement('button');
+          moreBtn.className = 'btn';
+          moreBtn.setAttribute('data-loadmore-day', day);
+          moreBtn.setAttribute('data-loadmore-prof', pid);
+          const remaining = rows.length - shown;
+          moreBtn.textContent = `Load more (${Math.min(PAGE_SIZE, remaining)} of ${remaining} remaining)`;
+          const toolbar = document.createElement('div');
+          toolbar.className = 'card';
+          toolbar.style.marginTop = '8px';
+          toolbar.appendChild(moreBtn);
+          box.appendChild(toolbar);
+        }
+      });
+
+      return box;
+    }
+
+    async function load(){
+      try{
+        const selectedDay = dayEl.value || null;
+        const selectedProfile = profileSel.value || '';
+        const limit = parseInt(limitSel.value || '1000', 10);
+        const types = new Set(selectedTypes());
+
+        // Build a key that represents the current filters
+        const filterKey = [
+          selectedDay || '',
+          selectedProfile || '',
+          Array.from(types).sort().join(','), // normalised types
+          String(limit)
+        ].join('|');
+
+        // Only reset paging state if filters changed since last load
+        if (filterKey !== lastFilterKey) {
+          for (const k in pagingState) delete pagingState[k];
+          lastFilterKey = filterKey;
+        }
+
+        // Fetch events from server
+        const all = await fetchEvents(limit);
+
+        // Rebuild profile dropdown from whatever we have
+        rebuildProfileDropdown(all);
+
+        // Client-side day/type filtering
+        const byDay = all.filter(ev => types.has(ev.event_type))
+                         .filter(ev => !selectedDay || dayKeyFrom(ev) === selectedDay);
+
+        countInfo.textContent = String(byDay.length);
+
+        // Build CSV links
+        updateCsvLinks(selectedDay, selectedProfile || '', all);
+
+        // Group and render
+        const grouped = groupByDayAndProfile(byDay, selectedProfile || '');
+        const dayKeys = Object.keys(grouped).sort().reverse(); // newest day first
+
+        daysContainer.innerHTML = '';
+        if (!dayKeys.length){
+          emptyEl.style.display = 'block';
+          return;
+        }
+        emptyEl.style.display = 'none';
+        dayKeys.forEach(dk => {
+          const el = renderDay(dk, grouped[dk], selectedProfile || '');
+          daysContainer.appendChild(el);
+        });
+      } catch (e){
+        daysContainer.innerHTML = '';
+        emptyEl.style.display = 'block';
+        emptyEl.textContent = 'Failed to load logs.';
+      }
+    }
+
+    // Delegate clicks for all “Load more” buttons
+    document.addEventListener('click', (e) => {
+      const btn = e.target.closest('button[data-loadmore-day]');
+      if (!btn) return;
+      const day = btn.getAttribute('data-loadmore-day');
+      const pid = btn.getAttribute('data-loadmore-prof');
+      if (!day || !pid) return;
+      pagingState[day] ||= {};
+      const current = pagingState[day][pid] || PAGE_SIZE;
+      pagingState[day][pid] = current + PAGE_SIZE;
+      load();
+    });
+
+    // Wire controls
+    [dayEl, profileSel, limitSel].forEach(el => el.addEventListener('change', load));
+    refreshBtn.addEventListener('click', load);
+
+    // Initial load
+    const today = new Date().toISOString().slice(0,10);
+    dayEl.value = today;
+    load();
+  </script>
+</body>
+</html>
+
+

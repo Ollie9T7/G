@@ -1,0 +1,374 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Reservoir Management</title>
+
+  <!-- fonts & icons -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Open+Sans:ital,wght@0,300..800;1,300..800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <style>
+    /* base + theme (match Scale page) */
+    html, body { margin: 0; padding: 0; }
+    *, *::before, *::after { box-sizing: border-box; }
+
+    :root {
+      --w: 850px; --pad: 16px; --gap: 14px; --br: 10px;
+      --ink: #e7eef7; --muted:#aac2de; --hint:#9bb4d3;
+      --bg: #0b0f14; --card:#121925; --border:#243247; --well:#0d1420; --well2:#1e2a3a;
+      --ok:#7bd88f; --warn:#f7c948; --bad:#ff7b7b;
+    }
+
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; background:var(--bg); color:var(--ink); }
+    .wrap { max-width: var(--w); margin: 28px auto; padding: 0 var(--pad); }
+
+    /* keep header constrained like other pages */
+    header, .header, .site-header, nav.header, nav.top, .topnav {
+      max-width: var(--w);
+      margin: 0 auto;
+      padding: 0 var(--pad);
+    }
+
+    .topbar { display:flex; align-items:center; gap:12px; margin-bottom:18px; }
+    .btn { background:var(--well2); color:var(--ink); border:1px solid #2a3950; padding:8px 12px; border-radius:8px; cursor:pointer; text-decoration:none; }
+    .btn:disabled { opacity:.55; cursor:not-allowed; }
+    h1 { font-size: 22px; margin:0; }
+    .btn-grey {
+      background: #1a2535;
+      color: #7a8ca8;
+      border-color: #2a3950;
+      opacity: 0.8;
+    }
+    .btn-green {
+      background: #adfb13;
+      color: #121212;
+      border-color: #adfb13;
+    }
+    /* NEW: stop button colour */
+    .btn-red {
+      background: #2a1820;
+      color: #ffb6c1;
+      border-color: #6b2a3a;
+    }
+
+    .big { font-size:65px; line-height:1; font-weight:800; letter-spacing:.2px; }
+    .kv { display:flex; gap:8px 16px; flex-wrap:wrap; font-size:13px; color:var(--hint); }
+    .kv b { color:var(--ink); font-weight:700; }
+    .muted { color:var(--muted); }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+
+    .pill { padding:2px 8px; border-radius:16px; border:1px solid #2a3950; background:var(--well); color:var(--muted); font-size:12px; }
+    .page-description { margin: 0 0 25px 0; font-size: 14px; line-height: 1.5; color: var(--hint); }
+
+    /* === FIELDSET style to match Global Settings look === */
+    fieldset.res-box {
+      border:1px solid var(--border);
+      border-radius: 8px;
+      background: var(--card);
+      padding: var(--pad);
+      margin: 0 0 18px 0;
+    }
+    fieldset.res-box > legend {
+      color: var(--ink);
+      padding: 0 6px;
+      font-weight: 600;
+    }
+
+    /* Row 1: 30% | 70% (percentage | progress bar) */
+    .row1 {
+      display:grid;
+      grid-template-columns: 22% 78%;
+      gap: 16px;
+      align-items: center;
+      margin-bottom: 35px;
+      margin-top: 15px;
+      padding: 0 5px;
+    }
+    .row1 .pct { display:flex; align-items:center; }
+    .row1 .bar { display:flex; align-items:center; }
+
+    /* Row 2: 50% | 50% (data | buttons) */
+    .row2 {
+      display:grid;
+      grid-template-columns: 40% 60%;
+      gap: 16px;
+      align-items: center;
+      padding: 0 21px 0 0;
+    }
+    .row2 .action { display:flex; justify-content:flex-end; gap:10px; } /* NEW: space between Stop and Renew */
+
+    /* Segmented progress bar (kept as per your accepted design) */
+    .progress{
+      width:100%;
+      height:50px; /* taller bar as requested earlier */
+      background:#0c141f;
+      border:1px solid #22324a;
+      border-radius:3px;
+      overflow:hidden;
+      position:relative;
+    }
+    .progress > div{
+      height:100%;
+      width:0;
+      transition: width .12s linear;
+      border-radius:inherit;
+      background: linear-gradient(90deg, #0171E3, #39B8FF);
+      /* segmented mask */
+      --seg-w: 9px;
+      --seg-gap: 3px;
+      -webkit-mask: repeating-linear-gradient(90deg,#000 0 calc(var(--seg-w)),transparent calc(var(--seg-w)) calc(var(--seg-w) + var(--seg-gap)));
+              mask: repeating-linear-gradient(90deg,#000 0 calc(var(--seg-w)),transparent calc(var(--seg-w)) calc(var(--seg-w) + var(--seg-gap)));
+      box-shadow: inset 0 0 0 1px rgba(123,216,143,.06);
+    }
+
+    @media (max-width: 700px) {
+      .topbar { flex-wrap:wrap; }
+      .row1, .row2 { grid-template-columns: 1fr; }
+      .row2 .action { justify-content: flex-start; }
+    }
+    
+    .bar-inner {
+      width: 100%;
+      padding-right: var(--pad); /* matches the card padding for consistent spacing */
+      box-sizing: border-box;
+    }
+
+    /* ===== Tooltip (only when button is grey) ===== */
+    #renew-btn.btn-grey { position: relative; }
+    #renew-btn.btn-grey:hover::after {
+      content: attr(data-tip);
+      position: absolute;
+      right: 0;
+      top: calc(100% + 8px);
+      background: #0d1420;
+      color: #e7eef7;
+      border: 1px solid #2a3950;
+      padding: 6px 8px;
+      border-radius: 6px;
+      font-size: 12px;
+      white-space: nowrap;
+      z-index: 10;
+      pointer-events: none;
+    }
+    #renew-btn.btn-grey:hover::before {
+      content: "";
+      position: absolute;
+      right: 12px;
+      top: 100%;
+      border: 6px solid transparent;
+      border-bottom-color: #2a3950; /* border edge */
+      pointer-events: none;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- HEADER -->
+  {% include "header2.html" %}
+
+  <div class="wrap">
+    <div class="topbar">
+      <h1>Reservoir Management</h1>
+      <span class="pill mono" id="liveStamp">live</span>
+    </div>
+
+    <div class="page-description">
+      <p>Monitor your main reservoir. Use the wizard when you need to renew the water, dose nutrients, and mix. The fine “sweet-spot” fill gauge only appears inside the wizard during refilling.</p>
+    </div>
+
+    <!-- MAIN RESERVOIR as a fieldset with legend (like Global Settings) -->
+    <fieldset class="res-box" id="main-box">
+      <legend>Main reservoir</legend>
+
+      <!-- Row 1: 30% | 70% -->
+      <div class="row1">
+        <div class="pct">
+          <div class="big"><span id="main-pct">--</span>%</div>
+        </div>
+        <div class="bar">
+          <div class="bar-inner">
+            <div class="progress" title="Level towards target">
+              <div id="main-bar"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+
+      <!-- Row 2: 50% | 50% -->
+      <div class="row2">
+        <div class="data">
+          <div class="kv">
+            <div>Last fill: <b id="main-last">—</b></div>
+            <div>Profile: <b id="main-prof">—</b></div>
+            <div>Water temp: <b id="main-temp">—</b> °C</div>
+            <div>Water used: <b id="main-used">—</b> L</div>
+          </div>
+        </div>
+        <div class="action">
+          <!-- NEW: Stop for renewal button -->
+          <button id="renew-stop-btn" class="btn btn-red" type="button" title="Stop the active profile to begin renewal">
+            <i class="fa fa-stop"></i>&nbsp; Stop for renewal
+          </button>
+
+          <!-- Existing Renew button (kept), now hard-gated in JS until Stop is clicked -->
+          <a id="renew-btn" class="btn btn-grey" data-tip="Not required yet"
+             href="{{ url_for('reservoirs.reservoir_wizard', step=1) }}">
+            <i class="fa fa-rotate"></i>&nbsp; Renew main reservoir
+          </a>
+        </div>
+      </div>
+    </fieldset>
+
+    <!-- (Humidifier section to go here) -->
+
+  </div>
+
+<script>
+  let SETTINGS = null;
+
+  async function loadSettingsOnce() {
+    if (SETTINGS) return SETTINGS;
+    try {
+      const r = await fetch('/api/settings', { cache: 'no-store' });
+      SETTINGS = await r.json();
+    } catch (e) {
+      SETTINGS = null;
+    }
+    return SETTINGS;
+  }
+
+  // === Hard gate for Renew until Stop clicked ===
+  // Local session flag; Renew is locked until we call /api/reservoirs/renewal/begin successfully.
+  let RENEW_UNLOCKED = false;
+
+  (function(){
+    const $ = s => document.querySelector(s);
+    const renewLink = $('#renew-btn');
+    const stopBtn   = $('#renew-stop-btn');
+
+    // Prevent navigating to the wizard if not unlocked yet
+    renewLink.addEventListener('click', (ev) => {
+      if (!RENEW_UNLOCKED) {
+        ev.preventDefault();
+        // Force the grey/tooltip state to make it obvious
+        renewLink.classList.add('btn-grey');
+        renewLink.setAttribute('data-tip', 'Stop the profile first');
+        renewLink.setAttribute('aria-disabled', 'true');
+      }
+    });
+
+    // Stop for renewal → BEGIN the renewal process (server logs "Reservoir renewal: BEGIN")
+    stopBtn.addEventListener('click', async () => {
+      stopBtn.disabled = true;
+      const originalHtml = stopBtn.innerHTML;
+      stopBtn.innerHTML = '<i class="fa fa-spinner fa-spin"></i>&nbsp; Stopping…';
+      try {
+        const r = await fetch('/api/reservoirs/renewal/begin', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'X-Requested-With': 'fetch'
+          },
+          body: 'reason=reservoir_renewal'
+        });
+        const ok = r.ok ? true : false;
+        if (ok) {
+          RENEW_UNLOCKED = true;
+          renewLink.removeAttribute('aria-disabled');
+          renewLink.setAttribute('data-tip', 'Ready – continue to renewal wizard');
+        } else {
+          alert('Could not start renewal (pause + log) on the server.');
+        }
+      } catch (e) {
+        alert('Error contacting server to start renewal.');
+      } finally {
+        stopBtn.disabled = false;
+        stopBtn.innerHTML = originalHtml;
+      }
+    });
+  })();
+
+  // (… keep isCriticalReservoir + applyButtonState exactly as-is …)
+
+  (function(){
+    const $ = s => document.querySelector(s);
+    const fmtPct = v => (v==null||isNaN(v)) ? "--" : Math.round(v);
+
+    // ⬇️ make this async so we can read SETTINGS once and compute water_used
+    async function applyMain(d){
+      $('#main-pct').textContent = fmtPct(d.percent);
+      $('#main-bar').style.width = ((d.percent||0)) + '%';
+      $('#main-last').textContent = d.last_fill ? new Date(d.last_fill).toLocaleString() : '—';
+      $('#main-prof').textContent = d.profile_running || '—';
+      $('#main-temp').textContent =
+        (typeof d.water_temp_c === 'number') ? d.water_temp_c.toFixed(1) : '—';
+
+      // ---- Water used (L) = full capacity (kg≈L) - water_kg ----
+      // Prefer a backend-provided field if you later add one; otherwise compute here.
+      let used = null;
+
+      // If backend ever adds d.water_used, use it:
+      if (typeof d.water_used === 'number') {
+        used = d.water_used;
+      } else {
+        // Compute on the client using settings + live water_kg
+        const s = await loadSettingsOnce();
+        const cap = Number(s?.reservoir_full_capacity_kg ?? 0);
+        const left = (typeof d.water_kg === 'number') ? d.water_kg : null;
+        if (cap > 0 && left !== null) used = Math.max(0, cap - left);
+      }
+
+      const usedText = (used === null || isNaN(used)) ? '—' : `${used.toFixed(1)}`;
+      $('#main-used').textContent = usedText;  // label already says “L”
+    }
+
+    // Enforce the Renew gate AFTER your existing applyButtonState has done its colour work
+    function enforceRenewGate() {
+      const renewLink = document.getElementById('renew-btn');
+      if (!renewLink) return;
+
+      if (!window.RENEW_UNLOCKED) {
+        // Lock the button visually and functionally (regardless of its current colour)
+        renewLink.classList.add('btn-grey');
+        renewLink.setAttribute('aria-disabled', 'true');
+        renewLink.setAttribute('data-tip', 'Stop the profile first');
+      } else {
+        // Remove the functional lock; keep whatever visual class your own logic applied
+        renewLink.removeAttribute('aria-disabled');
+        // Gentle hint once unlocked
+        if (!renewLink.classList.contains('btn-grey')) {
+          renewLink.setAttribute('data-tip', 'Ready – continue to renewal wizard');
+        }
+      }
+    }
+
+    async function poll(){
+      try{
+        const r = await fetch('/api/reservoirs/live', { cache: 'no-store' });
+        const j = await r.json();
+        const main = j.main || {};
+        await applyMain(main);               // ⬅️ now awaited
+        await applyButtonState(main);        // keep YOUR logic that turns green when low
+        enforceRenewGate();                  // ⬅️ hard gate layered after your logic
+        const el = document.getElementById('liveStamp');
+        if (el) el.textContent = 'live • ' + new Date().toLocaleTimeString();
+      }catch(e){
+        // keep last values if fetch fails
+      }
+    }
+
+    setInterval(poll, 800);
+    poll();
+  })();
+</script>
+
+</body>
+</html>
+
+

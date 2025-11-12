@@ -1,0 +1,788 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Reservoir Renewal — Step 3</title>
+
+  <!-- fonts & icons -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Open+Sans:ital,wght@0,300..800;1,300..800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <style>
+    :root {
+      --w: 850px; --pad:16px; --gap:14px; --br:10px;
+      --ink:#e7eef7; --muted:#aac2de; --hint:#9bb4d3;
+      --bg:#0b0f14; --card:#121925; --border:#243247; --well:#0d1420; --well2:#1e2a3a;
+      --ok:#7bd88f; --warn:#f7c948; --bad:#ff7b7b; --accent:#ADFB13;
+      --run-grey:#1b2433; --run-green:#ADFB13; --run-blue:#39B8FF; --blue:#0171e3;
+    }
+    html, body { margin:0; padding:0; }
+    *, *::before, *::after { box-sizing:border-box; }
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; background:var(--bg); color:var(--ink); }
+
+    .wrap { max-width:var(--w); margin:34px auto; padding:0 calc(var(--pad) + 2px); }
+    .pill { padding:2px 8px; border-radius:16px; border:1px solid #2a3950; background:var(--well); color:var(--muted); font-size:12px; }
+
+    .btn { font-size:14px; background:var(--well2); color:var(--ink); border:1px solid #2a3950; padding:9px 14px; border-radius:8px; cursor:pointer; text-decoration:none; font-weight:600; display:inline-flex; align-items:center; gap:8px; }
+    .btn-grey { background:#1a2535; color:#7a8ca8; border-color:#2a3950; }
+    .btn-green { background:var(--accent); color:#121212; border-color:var(--accent); }
+    .btn-blue { background:var(--blue); color:#fff; border-color:var(--blue); }
+    .btn[disabled], .btn[aria-disabled="true"] { opacity:.55; cursor:not-allowed; pointer-events:none; }
+    
+    .muted { color:var(--muted); }
+
+    .stepper-wide { display:flex; gap:8px; width:100%; margin:0 0 16px 0; }
+    .stepper-wide .seg { flex:1; height:26px; border-radius:6px; background:#2a3950;
+      display:flex; align-items:center; justify-content:center;
+      font-size:12px; color:#a9b8cf; letter-spacing:0.2px; text-decoration:none; }
+    .stepper-wide .seg.active { background:var(--accent); color:#121212; font-weight:600; }
+    .stepper-wide .seg.done { background:#1f2a3c; color:#9db0c9; position:relative; }
+    .stepper-wide .seg.done::after{
+      content:"\f00c"; font-family:"Font Awesome 6 Free"; font-weight:900; font-size:11px; margin-left:6px;
+    }
+
+    .stepbar { display:flex; align-items:center; justify-content:space-between; margin:30px 0 40px 0; }
+    h1 { font-size:22px; margin:0; }
+
+    fieldset.box {
+      border:1px solid var(--border); border-radius:8px; background:var(--card);
+      padding:var(--pad); margin:0 0 18px 0;
+    }
+    legend { padding:0 6px; }
+
+    .kv { display:flex; gap:12px 18px; flex-wrap:wrap; font-size:13px; color:#9bb4d3; }
+    .kv b { color:#e7eef7; }
+
+    .grid-2 { display:grid; grid-template-columns: 1fr 1fr; gap:14px; }
+    @media (max-width: 700px){ .grid-2 { grid-template-columns: 1fr; } }
+
+    .row { display:grid; grid-template-columns: 220px 1fr; gap:10px; align-items:center; }
+    .row select {
+      width:100%; max-width:100%; padding:10px 12px; border-radius:10px;
+      border:1px solid #2a3950; background:#0d1420; color:#e7eef7; font-size:14px;
+    }
+
+    .readout { border:1px solid #2a3950; border-radius:8px; background:#0d1420; padding:12px; }
+    .readout h3 { margin:0 0 8px 0; font-size:15px; color:#e7eef7; }
+    .readout .line { display:flex; justify-content:space-between; font-size:13px; color:#9bb4d3; padding:4px 0; }
+    .readout .line b { color:#e7eef7; }
+
+    .locked-section[aria-disabled="true"] { opacity:.55; filter:saturate(0.75); pointer-events:none; }
+    .actions { display:flex; justify-content:space-between; gap:10px; margin-top:10px; }
+    .note { font-size:12px; color:#9bb4d3; margin-top:15px; }
+    .btn-red { background:#3a1414; color:#ffb4b4; border:1px solid #6b1f1f; }
+    .btn-red:hover { box-shadow: 0 0 0 2px rgba(255,123,123,0.15), 0 0 12px rgba(255,123,123,0.35); }
+    /* Keep the stop button text on one line */
+    #stopBtn { white-space: nowrap; }
+    .danger-note { font-size:12px; color:#ffb4b4; margin-top:6px; }
+
+    /* === Dosing cards & progress bars === */
+    .dose-grid { display:grid; grid-template-columns: 1fr 1fr; gap:14px; margin-top:8px; }
+    @media (max-width: 700px){ .dose-grid { grid-template-columns: 1fr; } }
+
+    .dose-card { border:1px solid #2a3950; border-radius:8px; background:#0d1420; padding:12px; }
+    .dose-card h3 { margin:0 0 10px 0; font-size:15px; display:flex; align-items:center; gap:8px; }
+    .dose-meta { font-size:12px; color:#9bb4d3; display:flex; justify-content:space-between; margin-bottom:8px; }
+    .bar { height:16px; background:#0c141f; border:1px solid #22324a; border-radius:4px; overflow:hidden; position:relative; }
+    .fill { height:100%; width:0%; background:#39B8FF; }
+    /* stripes WITHOUT animation */
+    .indet::before{
+      content:""; position:absolute; inset:0;
+      background: repeating-linear-gradient(45deg, rgba(255,255,255,.12) 0 10px, transparent 10px 20px);
+      /* no animation */
+    }
+
+    .dose-eta { margin-top:6px; font-size:12px; color:#9bb4d3; display:flex; justify-content:space-between; }
+    .dose-eta b { color:#e7eef7; }
+
+    /* === Run button: full-width; hover glow; RUNNING = pulsing BLUE border; FINISHED = solid green === */
+    .run-wide { margin-top:14px; display:flex; }
+    .run-btn-wide{
+      width:100%; height:48px; border-radius:999px;
+      background:var(--run-grey); color:#c9d6ea;
+      border:1px solid #2a3950;
+      font-size:16px; font-weight:800; letter-spacing:.2px; cursor:pointer;
+      display:inline-flex; align-items:center; justify-content:center; gap:10px;
+      transition: box-shadow .18s ease, border-color .18s ease, background .18s ease, color .18s ease, transform .05s ease;
+      box-shadow: inset 0 0 0 0 rgba(173,251,19,0);
+    }
+    /* hover glow when idle */
+    .run-btn-wide:hover:not([disabled]):not(.is-running){
+      border-color: #0171e3;
+      box-shadow: 0 0 0 2px rgba(1,113,227,0.18), 0 0 14px rgba(1,113,227,0.28);
+      transform: translateY(-0.5px);
+    }
+    .run-btn-wide:active:not([disabled]):not(.is-running){
+      transform: translateY(0);
+    }
+    /* running state: keep grey fill; pulsing BLUE border glow */
+    .run-btn-wide.is-running{
+      background: var(--run-grey);
+      color:#c9d6ea;
+      border-color: var(--run-blue);
+      box-shadow: 0 0 0 2px rgba(57,184,255,0.26);
+      animation: runpulse 1.2s ease-in-out infinite;
+    }
+    .run-btn-wide.is-running[disabled]{ opacity:1; cursor:default; }
+
+    /* FINISHED state: solid green background */
+    .run-btn-wide.is-complete{
+      background: #0171e3;
+      color:#fff;
+      border-color: #0171e3;
+      box-shadow: none;
+      animation: none;
+    }
+
+    @keyframes runpulse{
+      0%   { box-shadow: 0 0 0 2px rgba(57,184,255,0.26), 0 0 0 0 rgba(57,184,255,0.00); }
+      60%  { box-shadow: 0 0 0 2px rgba(57,184,255,0.26), 0 0 14px 8px rgba(57,184,255,0.22); }
+      100% { box-shadow: 0 0 0 2px rgba(57,184,255,0.26), 0 0 0 0 rgba(57,184,255,0.00); }
+    }
+
+    .run-btn-wide[disabled]{ cursor:not-allowed; }
+    
+    .fill.done {
+      background: var(--run-green);
+      transition: background 0.4s ease;
+    }
+
+    .dose-meta b.is-done { color: var(--run-green); }
+  </style>
+</head>
+<body>
+  {% include "header2.html" %}
+  <div class="wrap">
+    <div class="stepper-wide" aria-label="Wizard steps">
+  {% set total = 5 %}
+  {% for i in range(1, total + 1) %}
+    {% set is_active = (i == step) %}
+    {% set is_done = (i < step) %}
+    <a class="seg {% if is_active %}active{% endif %}"
+       href="{{ url_for('reservoirs.reservoir_wizard', step=i) }}"
+       {% if is_active %}aria-current="step"{% endif %}>
+      {% if is_done %}<i class="fa fa-check" aria-hidden="true"></i>{% endif %}
+      Step {{ i }}
+    </a>
+  {% endfor %}
+</div>
+
+
+    <div class="stepbar">
+      <div>
+        <h1 style="margin:0 0 6px 0; font-size:22px;">Reservoir renewal</h1>
+<div class="muted" style="font-size:13px;">Step {{ step }} of 5 — Choose a recipe and dose nutrients.</div>
+      </div>
+      <span class="pill" id="liveStamp">live</span>
+    </div>
+
+    <!-- Fieldset 1: Choose & Confirm Profile (UNCHANGED) -->
+    <fieldset class="box">
+      <legend>Choose a recipe</legend>
+
+      <div class="kv">
+        <div>Currently active profile: <b id="activeNow">—</b></div>
+        <div>Current litres (live): <b id="litresLive">—</b></div>
+      </div>
+
+      <form id="profile-select-form" method="post" action="{{ url_for('reservoirs.reservoir_wizard', step=3) }}">
+        <input type="hidden" name="action" value="choose_profile">
+        <div class="row" style="margin-top:10px;">
+          <label for="profileSelect">Profile for nutrient recipe</label>
+          <select id="profileSelect" name="selected_profile" required>
+            <option value="" disabled {% if not selected_profile %}selected{% endif %}>— Select a profile —</option>
+            {% for p in (profiles_meta or []) %}
+              <option value="{{ p.filename }}"
+                      data-a-ml="{{ p.nutrients.A.ml if p.nutrients and p.nutrients.A else '' }}"
+                      data-a-perl="{{ p.nutrients.A.per_litres if p.nutrients and p.nutrients.A else '' }}"
+                      data-b-ml="{{ p.nutrients.B.ml if p.nutrients and p.nutrients.B else '' }}"
+                      data-b-perl="{{ p.nutrients.B.per_litres if p.nutrients and p.nutrients.B else '' }}"
+                      {% if selected_profile and selected_profile == p.filename %}selected{% endif %}>
+                {{ p.name }} ({{ p.filename }})
+              </option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <!-- Read-only confirmation of nutrient rules -->
+        <div class="grid-2" style="margin-top:14px;">
+          <div class="readout">
+            <h3>Nutrient Pump A</h3>
+            <div class="line"><span>ml (per rule)</span><b id="a_ml">—</b></div>
+            <div class="line"><span>per litres</span><b id="a_perl">—</b></div>
+            <div class="line"><span>To add now</span><b id="needA_ml">—</b></div>
+          </div>
+          <div class="readout">
+            <h3>Nutrient Pump B</h3>
+            <div class="line"><span>ml (per rule)</span><b id="b_ml">—</b></div>
+            <div class="line"><span>per litres</span><b id="b_perl">—</b></div>
+            <div class="line"><span>To add now</span><b id="needB_ml">—</b></div>
+          </div>
+        </div>
+
+        <div class="actions">
+   
+          <div></div>
+          <button id="confirmBtn" class="btn btn-blue" type="submit" disabled>
+            Confirm profile
+          </button>
+        </div>
+      </form>
+    </fieldset>
+
+    <!-- Fieldset 2: Dosing -->
+    <fieldset class="box locked-section" id="doseBox" aria-disabled="true">
+      <legend>Dose nutrients</legend>
+
+      <div class="dose-grid">
+        <!-- Pump A card -->
+        <div class="dose-card" id="cardA">
+          <h3><i class="fa-solid fa-flask"></i> Pump A</h3>
+          <div class="dose-meta">
+            <span>Target: <b id="metaA_target">—</b></span>
+            <span>Status: <b id="metaA_status">Idle</b></span>
+          </div>
+          <div class="bar indet" id="barA"><div class="fill" id="fillA"></div></div>
+          <div class="dose-eta">
+            <span>Time</span>
+            <span><b id="etaA">—</b></span>
+          </div>
+        </div>
+
+        <!-- Pump B card -->
+        <div class="dose-card" id="cardB">
+          <h3><i class="fa-solid fa-flask"></i> Pump B</h3>
+          <div class="dose-meta">
+            <span>Target: <b id="metaB_target">—</b></span>
+            <span>Status: <b id="metaB_status">Idle</b></span>
+          </div>
+          <div class="bar indet" id="barB"><div class="fill" id="fillB"></div></div>
+          <div class="dose-eta">
+            <span>Time</span>
+            <span><b id="etaB">—</b></span>
+          </div>
+        </div>
+      </div>
+
+      <div class="run-wide" style="gap:10px;">
+        <button id="runBtn" class="run-btn-wide" type="button" disabled>
+          <i class="fa-solid fa-play"></i> Run Pumps
+        </button>
+        <!-- NEW: “Stop and Reset” + no-wrap -->
+          <button id="stopBtn" class="btn btn-red" type="button" style="display:none; white-space:nowrap;">
+            <i class="fa-solid fa-stop"></i> <span>Stop and Reset</span>
+          </button>
+      </div>
+
+      <div class="note">This runs each pump in sequence using the saved calibration. Keep this page open while dosing completes.</div>
+
+      <div class="actions">
+        <div></div>
+        <button id="nextBtn" class="btn btn-green" disabled>
+          Next step <i class="fa fa-chevron-right"></i>
+        </button>
+      </div>
+
+    </fieldset>
+  </div>
+
+<!-- Expose server values -->
+<script>
+  const GS_INIT       = {{ (gs or {}) | tojson }};
+  const MAIN_INIT     = {{ (main or {}) | tojson }};
+  const LOCKED_PROF   = {{ (selected_profile or '') | tojson }};
+  const LOCKED_NAME   = {{ (selected_profile_name or '') | tojson }};
+  const NUTS_INIT     = {{ (nutrients or {}) | tojson }};
+</script>
+
+
+<script>
+  const $ = s => document.querySelector(s);
+  const profileSel = $('#profileSelect');
+  const a_ml = $('#a_ml'), a_perl = $('#a_perl'), b_ml = $('#b_ml'), b_perl = $('#b_perl');
+  const confirmBtn = $('#confirmBtn');
+
+  const elLive = $('#liveStamp');
+  const doseBox = $('#doseBox');
+  const elLitres = $('#litresLive');
+  const elNeedA = $('#needA_ml');
+  const elNeedB = $('#needB_ml');
+  const runBtn = $('#runBtn');
+  const nextBtn = $('#nextBtn');
+  const stopBtn = $('#stopBtn'); /* NEW */
+
+  // Elements in the dosing box
+  const metaA_target = $('#metaA_target');
+  const metaB_target = $('#metaB_target');
+  const metaA_status = $('#metaA_status');
+  const metaB_status = $('#metaB_status');
+  const barA = $('#barA'), barB = $('#barB');
+  const fillA = $('#fillA'), fillB = $('#fillB');
+  const etaA = $('#etaA'), etaB = $('#etaB');
+
+  function tickLabel(){ if(elLive) elLive.textContent = 'live • ' + new Date().toLocaleTimeString(); }
+
+  function normRule(x){
+    if(!x) return {ml:null, ml_for:null};
+    let ml = x.ml; let per = x.per_litres ?? x.per_litre ?? x.per_liter ?? x.ml_for;
+    ml = (ml==null || isNaN(ml)) ? null : Number(ml);
+    per = (per==null || isNaN(per)) ? null : Number(per);
+    return {ml: ml, ml_for: per};
+  }
+
+  function hydrateRulesFromSelect(){
+    const opt = profileSel?.options?.[profileSel.selectedIndex];
+    if(!opt || !profileSel?.value){
+      a_ml.textContent = a_perl.textContent = b_ml.textContent = b_perl.textContent = '—';
+      confirmBtn.disabled = true;
+      return;
+    }
+    a_ml.textContent = opt.getAttribute('data-a-ml') || '—';
+    a_perl.textContent = opt.getAttribute('data-a-perl') || '—';
+    b_ml.textContent = opt.getAttribute('data-b-ml') || '—';
+    b_perl.textContent = opt.getAttribute('data-b-perl') || '—';
+    confirmBtn.disabled = false;
+  }
+  profileSel?.addEventListener('change', hydrateRulesFromSelect);
+  hydrateRulesFromSelect(); // initial paint
+
+  // Live / dosing section (enabled ONLY when server has locked a profile)
+  let liveLitres = (typeof MAIN_INIT?.water_kg === 'number') ? MAIN_INIT.water_kg : null;
+
+  function computeNeeded(nuts, litres){
+    const A = normRule(nuts?.A);
+    const B = normRule(nuts?.B);
+    const ratioA = (A.ml_for && A.ml_for > 0 && A.ml!=null) ? (A.ml / A.ml_for) : 0;
+    const ratioB = (B.ml_for && B.ml_for > 0 && B.ml!=null) ? (B.ml / B.ml_for) : 0;
+    const needA = (litres!=null) ? Math.max(0, ratioA * litres) : null;
+    const needB = (litres!=null) ? Math.max(0, ratioB * litres) : null;
+    return {A: needA, B: needB};
+  }
+
+  function paintNeeded(nuts, litres){
+    const need = computeNeeded(nuts, litres);
+    elNeedA.textContent = (need.A==null) ? '—' : need.A.toFixed(1) + ' ml';
+    elNeedB.textContent = (need.B==null) ? '—' : need.B.toFixed(1) + ' ml';
+    metaA_target.textContent = (need.A==null) ? '—' : need.A.toFixed(1) + ' ml';
+    metaB_target.textContent = (need.B==null) ? '—' : need.B.toFixed(1) + ' ml';
+  }
+
+  function setDoseSectionEnabled(enabled){
+    doseBox.setAttribute('aria-disabled', enabled ? 'false' : 'true');
+    if(enabled){
+      doseBox.classList.remove('locked-section');
+      runBtn.disabled = false;
+    }else{
+      doseBox.classList.add('locked-section');
+      runBtn.disabled = true;
+    }
+  }
+
+  const serverLocked = !!LOCKED_PROF && Object.keys(NUTS_INIT || {}).length > 0;
+  setDoseSectionEnabled(serverLocked);
+  if(serverLocked){
+    paintNeeded(NUTS_INIT, liveLitres);
+    nextBtn.disabled = false;
+  } else {
+    nextBtn.disabled = true;
+  }
+
+  // ===== Deterministic progress (planned-time CSS transition) =====
+  let runActive = false;
+  let phaseNow = null;                  // 'A' | 'B' | null
+  let aStartTS = null, bStartTS = null; // wallclock (performance.now()/1000)
+  let aTimer = null,  bTimer = null;
+  let dosePlan = { A: null, B: null };  // planned seconds
+  let phaseStartedAtEpoch = null;       // epoch seconds of current phase start (from backend)
+
+  function killStripes(el){
+    el.style.background = '#39B8FF';
+    el.style.backgroundImage = 'none';
+    el.style.webkitMask = 'none';
+    el.style.mask = 'none';
+    el.style.animation = 'none';
+  }
+
+  function resetBars(){
+    if (aTimer) clearInterval(aTimer); aTimer = null;
+    if (bTimer) clearInterval(bTimer); bTimer = null;
+
+    fillA.style.transition = 'none';
+    fillB.style.transition = 'none';
+    fillA.style.width = '0%';
+    fillB.style.width = '0%';
+    fillA.classList.remove('done');  
+    fillB.classList.remove('done');   
+    killStripes(fillA);
+    killStripes(fillB);
+
+    etaA.textContent = '—';
+    etaB.textContent = '—';
+    metaA_status.textContent = 'Idle';
+    metaB_status.textContent = 'Idle';
+    metaA_status.classList.remove('is-done');
+    metaB_status.classList.remove('is-done');
+
+    aStartTS = bStartTS = null;
+    phaseNow = null;
+  }
+  resetBars();
+
+  function fmtCountdown(sec){
+    if (sec == null || !isFinite(sec)) return '—';
+    const s = Math.max(0, sec);
+    if (s < 60) return s.toFixed(s<10 ? 1 : 0) + ' s';
+    const m = Math.floor(s/60), r = Math.round(s - m*60);
+    return `${m}m ${r}s`;
+  }
+
+  function startPhaseUI(which, plannedSeconds, startedAtEpoch){
+    if (plannedSeconds == null || plannedSeconds <= 0) return;
+
+    const nowPerf = performance.now()/1000;
+    const nowEpoch = Date.now()/1000;
+    let elapsed = 0;
+
+    if (startedAtEpoch && isFinite(startedAtEpoch)){
+      elapsed = Math.max(0, nowEpoch - startedAtEpoch);
+    }
+
+    elapsed = Math.min(plannedSeconds, Math.max(0, elapsed));
+    const remaining = Math.max(0, plannedSeconds - elapsed);
+
+    if (which === 'A' && aStartTS == null){
+      aStartTS = nowPerf - elapsed;
+      metaA_status.textContent = 'Running';
+      metaA_status.classList.remove('is-done');
+
+      const pctNow = (elapsed / plannedSeconds) * 100;
+      fillA.style.transition = 'none';
+      fillA.style.width = `${pctNow}%`;
+      requestAnimationFrame(()=>{
+        fillA.style.transition = `width ${remaining}s linear`;
+        fillA.style.width = '100%';
+      });
+
+      if (aTimer) clearInterval(aTimer);
+      aTimer = setInterval(()=>{
+        const elapsedNow = (performance.now()/1000) - aStartTS;
+        const left = Math.max(0, plannedSeconds - elapsedNow);
+        etaA.textContent = fmtCountdown(left);
+        if (left <= 0){
+          clearInterval(aTimer); aTimer = null;
+          metaA_status.textContent = 'Done';
+        }
+      }, 200);
+    }
+
+    if (which === 'B' && bStartTS == null){
+      bStartTS = nowPerf - elapsed;
+      metaB_status.textContent = 'Running';
+      metaB_status.classList.remove('is-done');
+
+      const pctNow = (elapsed / plannedSeconds) * 100;
+      fillB.style.transition = 'none';
+      fillB.style.width = `${pctNow}%`;
+      requestAnimationFrame(()=>{
+        fillB.style.transition = `width ${remaining}s linear`;
+        fillB.style.width = '100%';
+      });
+
+      if (bTimer) clearInterval(bTimer);
+      bTimer = setInterval(()=>{
+        const elapsedNow = (performance.now()/1000) - bStartTS;
+        const left = Math.max(0, plannedSeconds - elapsedNow);
+        etaB.textContent = fmtCountdown(left);
+        if (left <= 0){
+          clearInterval(bTimer); bTimer = null;
+          metaB_status.textContent = 'Done';
+        }
+      }, 200);
+    }
+  }
+
+  function finishPhaseUI(which){
+    if (which === 'A'){
+      fillA.style.transition = 'none';
+      fillA.style.width = '100%';
+      fillA.style.background = 'var(--run-green)';
+      metaA_status.textContent = 'Done';
+      metaA_status.classList.add('is-done');
+      etaA.textContent = '0 s';
+      if (aTimer) clearInterval(aTimer); aTimer = null;
+    } else if (which === 'B'){
+      fillB.style.transition = 'none';
+      fillB.style.width = '100%';
+      fillB.style.background = 'var(--run-green)';
+      metaB_status.textContent = 'Done';
+      metaB_status.classList.add('is-done');
+      etaB.textContent = '0 s';
+      if (bTimer) clearInterval(bTimer); bTimer = null;
+    }
+  }
+
+  async function poll(){
+    try{
+      const r = await fetch('/status.json', {cache:'no-store'});
+      const j = await r.json();
+      $('#activeNow').textContent = (j && j.profile) ? j.profile : '—';
+    }catch(e){}
+    try{
+      const r2 = await fetch('/api/reservoirs/live', {cache:'no-store'});
+      const j2 = await r2.json();
+      const m = j2 && j2.main ? j2.main : {};
+      const litres = (typeof m.water_kg === 'number') ? m.water_kg : null;
+      liveLitres = litres;
+      elLitres.textContent = (litres==null) ? '—' : litres.toFixed(2) + ' L';
+      if(serverLocked) paintNeeded(NUTS_INIT, liveLitres);
+
+      if (m.dosing_plan){
+        const pa = Number(m.dosing_plan.A_seconds || 0);
+        const pb = Number(m.dosing_plan.B_seconds || 0);
+        if (pa > 0) dosePlan.A = pa;
+        if (pb > 0) dosePlan.B = pb;
+      }
+      phaseStartedAtEpoch = (typeof m.dosing_phase_started_at === 'number') ? m.dosing_phase_started_at : null;
+
+      const running   = !!m.dosing_running;
+      const cancelled = !!m.dosing_cancelled;
+      const phase     = (m.dosing_phase === 'A' || m.dosing_phase === 'B') ? m.dosing_phase : null;
+
+      if (running && !runActive){
+        runActive = true;
+        runBtn.disabled = true;
+        runBtn.classList.remove('is-complete');
+        runBtn.classList.add('is-running');
+        runBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Running…';
+        nextBtn.disabled = true;
+        stopBtn.disabled = false;
+        stopBtn.style.display = 'inline-flex';
+      }
+
+      if (!running && runActive){
+        // finished OR was cancelled
+        runActive = false;
+        runBtn.disabled = false;
+        runBtn.classList.remove('is-running');
+
+        if (cancelled){
+          // Emergency stop => clean reset to ready-to-run
+          runBtn.classList.remove('is-complete');
+          runBtn.innerHTML = '<i class="fa-solid fa-play"></i> Run Pumps';
+          nextBtn.disabled = true;            // must run again before proceeding
+          stopBtn.style.display = 'none';
+
+          // Reset progress bars/labels so it looks unused
+          if (typeof resetBars === 'function') resetBars();
+          if (typeof setPhaseAProgress === 'function') setPhaseAProgress(0);
+          if (typeof setPhaseBProgress === 'function') setPhaseBProgress(0);
+          if (typeof showPhaseTime === 'function') showPhaseTime(null);
+        } else {
+          // Natural completion => allow Next
+          runBtn.classList.add('is-complete');
+          runBtn.textContent = 'Complete! Run again?';
+          nextBtn.disabled = false;
+          stopBtn.style.display = 'none';
+          if (aStartTS != null) finishPhaseUI('A');
+          if (bStartTS != null) finishPhaseUI('B');
+        }
+      }
+
+      // Phase edges → start deterministic transitions
+      if (phase === 'A' && phaseNow !== 'A' && aStartTS == null && dosePlan.A != null){
+        startPhaseUI('A', dosePlan.A, phaseStartedAtEpoch);
+      }
+      if (phase === 'B' && phaseNow !== 'B'){
+        if (aStartTS != null) finishPhaseUI('A');
+        if (bStartTS == null && dosePlan.B != null){
+          startPhaseUI('B', dosePlan.B, phaseStartedAtEpoch);
+        }
+      }
+      if (phase === null && phaseNow !== null){
+        if (aStartTS != null) finishPhaseUI('A');
+        if (bStartTS != null) finishPhaseUI('B');
+      }
+
+      phaseNow = phase;
+    }catch(e){}
+    tickLabel();
+  }
+  poll();
+  setInterval(poll, 400);
+
+  function setRunningState(on) {
+    runBtn.disabled = on || !serverLocked;
+    nextBtn.disabled = on || !serverLocked;
+  }
+
+  async function runDose(){
+    if(!serverLocked){ return; }
+    
+    // Ask for confirmation before running pumps
+    const ok = confirm("Are you sure you want to run the nutrient pumps?");
+    if (!ok) return; // cancel if user clicks 'Cancel'
+
+    // Build payload from existing nutrients (server converts to seconds & runs both pumps)
+    let litres = liveLitres;
+    if(litres==null){
+      try{
+        const r = await fetch('/api/reservoirs/live', {cache:'no-store'});
+        const j = await r.json();
+        litres = (j && j.main && typeof j.main.water_kg === 'number') ? j.main.water_kg : null;
+      }catch(e){}
+    }
+    if(litres==null){ alert('No live litre reading yet.'); return; }
+
+    const A = normRule(NUTS_INIT?.A);
+    const B = normRule(NUTS_INIT?.B);
+    const okRules = (A.ml!=null && A.ml_for!=null) || (B.ml!=null && B.ml_for!=null);
+    if(!okRules){ alert('No nutrient rules available for this profile.'); return; }
+
+    const payload = {
+      profile: { nutrients: { A:{ ml_for:A.ml_for, ml:A.ml }, B:{ ml_for:B.ml_for, ml:B.ml } } },
+      filled_litres: litres
+    };
+
+    // Reset UI and start
+    resetBars();
+    setRunningState(true);
+    runActive = true;
+    runBtn.classList.remove('is-complete');          /* clear finished look */
+    runBtn.classList.add('is-running');              /* BLUE pulsing */
+    runBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Running…';
+
+    /* SHOW STOP IMMEDIATELY (don’t wait for poll) */
+    stopBtn.style.display = 'inline-flex';
+    stopBtn.disabled = false;
+
+    try{
+      const res = await fetch('/api/reservoirs/dose', {
+        method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload)
+      });
+      const out = await res.json();
+
+      // planned seconds from the POST response (primary source)
+      const secs = out?.seconds || {};
+      const aSec = Number(secs.A_seconds ?? secs.A ?? NaN);
+      const bSec = Number(secs.B_seconds ?? secs.B ?? NaN);
+      dosePlan.A = Number.isFinite(aSec) && aSec > 0 ? aSec : null;
+      dosePlan.B = Number.isFinite(bSec) && bSec > 0 ? bSec : null;
+
+      if(!out.ok){
+        alert('Dosing error: ' + (out.error || 'Unknown'));
+        setRunningState(false);
+        runActive = false;
+        runBtn.classList.remove('is-running');
+        runBtn.innerHTML = '<i class="fa-solid fa-play"></i> Run Pumps';
+      }
+    }catch(err){
+      alert('Request failed. Check connection and try again.');
+      setRunningState(false);
+      runActive = false;
+      runBtn.classList.remove('is-running');
+      runBtn.innerHTML = '<i class="fa-solid fa-play"></i> Run Pumps';
+    }
+    // On success, the poll loop keeps it pulsing until the backend reports finish.
+  }
+
+  runBtn.addEventListener('click', runDose);
+
+  /* NEW: Stop handler */
+  async function stopDose(){
+    if (!runActive) return;
+    const ok = confirm("Stop dosing and reset immediately?");
+    if (!ok) return;
+
+    try{
+      stopBtn.disabled = true;
+      stopBtn.innerHTML = '<i class="fa-solid fa-stop"></i> Stopping…';
+
+      const res = await fetch('/api/nutrient/stop', { method:'POST' });
+      if (!res.ok){
+        // Revert minimal UI if backend didn’t accept stop
+        stopBtn.disabled = false;
+        stopBtn.innerHTML = '<i class="fa-solid fa-stop"></i> Stop and Reset';
+        alert('Failed to stop. Please try again.');
+        return;
+      }
+
+      // --- INSTANT RESET (don’t wait for poll) ---
+      runActive = false;
+      runBtn.disabled = false;
+      runBtn.classList.remove('is-running', 'is-complete');
+      runBtn.innerHTML = '<i class="fa-solid fa-play"></i> Run Pumps';
+      nextBtn.disabled = true;
+
+      // Hide STOP right away
+      stopBtn.style.display = 'none';
+      stopBtn.classList.add('hidden');
+      stopBtn.disabled = false;
+      stopBtn.innerHTML = '<i class="fa-solid fa-stop"></i> Stop and Reset';
+
+      // Reset any bars/phase timers immediately
+      if (typeof resetBars === 'function') resetBars();
+      if (typeof setPhaseAProgress === 'function') setPhaseAProgress(0);
+      if (typeof setPhaseBProgress === 'function') setPhaseBProgress(0);
+      if (typeof showPhaseTime === 'function') showPhaseTime(null);
+      // The poller will pick up dosing_running:false and dosing_cancelled:true next tick
+    }catch(e){
+      stopBtn.disabled = false;
+      stopBtn.innerHTML = '<i class="fa-solid fa-stop"></i> Stop';
+      alert('Network error. Please try again.');
+    }
+  }
+
+  stopBtn.addEventListener('click', stopDose);
+
+  // Keep the “live • HH:MM:SS” label ticking
+  setInterval(tickLabel, 1000);
+  tickLabel();
+
+  if(serverLocked){
+    paintNeeded(NUTS_INIT, liveLitres);
+  }
+  
+  // Unpause via local endpoint, then go straight to Step 5 (Step 4 is skipped)
+  async function goNextUnpauseThenStep5() {
+    const btn = document.getElementById('nextBtn');
+    const prev = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = 'Unpausing…';
+
+    try {
+      const res = await fetch('/api/reservoirs/unpause', {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        credentials: 'same-origin',
+        body: '{}' // harmless, avoids empty-body issues on some servers
+      });
+      if (!res.ok) {
+        const txt = await res.text();
+        alert(`Failed to unpause. HTTP ${res.status}\n${txt || '(no body)'}`);
+        throw new Error('unpause failed');
+      }
+      // Skip old Step 4 – go to Step 5
+      window.location.assign('/reservoirs/wizard?step=4');
+    } catch (e) {
+      btn.disabled = false;
+      btn.innerHTML = prev;
+    }
+  }
+
+  document.getElementById('nextBtn')?.addEventListener('click', (e) => {
+    e.preventDefault();
+    goNextUnpauseThenStep5();
+  });
+</script>
+
+
+
+
+</body>
+</html>
+
+

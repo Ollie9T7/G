@@ -1,0 +1,201 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Nutrient Pump Calibration</title>
+
+  <!-- fonts & icons -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Open+Sans:ital,wght@0,300..800;1,300..800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <style>
+    html, body { margin:0; padding:0; }
+    *, *::before, *::after { box-sizing: border-box; }
+    :root {
+      --w: 850px; --pad: 16px; --gap: 14px; --br: 10px;
+      --ink:#e7eef7; --muted:#aac2de; --hint:#9bb4d3;
+      --bg:#0b0f14; --card:#121925; --border:#243247; --well:#0d1420; --well2:#1e2a3a;
+      --accent:#ADFB13;
+    }
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; background:var(--bg); color:var(--ink); }
+    .wrap { max-width: var(--w); margin: 28px auto; padding: 0 var(--pad); }
+
+    header, .header, .site-header, nav.header, nav.top, .topnav {
+      max-width: var(--w);
+      margin: 0 auto;
+      padding: 0 var(--pad);
+    }
+
+    .topbar { display:flex; align-items:center; gap:12px; margin-bottom:18px; }
+    .btn { background:var(--well2); color:var(--ink); border:1px solid #2a3950; padding:10px 14px; border-radius:10px; cursor:pointer; text-decoration:none; font-weight:600; display:inline-flex; align-items:center; gap:8px; }
+    .btn:disabled { opacity:.55; cursor:not-allowed; }
+    .btn:active { transform: translateY(1px); }
+    h1 { font-size:22px; margin:0; }
+    .badge { display:inline-block; background:var(--well); color:#9ec1ff; border:1px solid #2a3950; padding:4px 8px; border-radius:999px; font-size:12px; }
+
+    .card, fieldset {
+      background:var(--card);
+      border:1px solid var(--border);
+      border-radius:14px;
+      padding:18px;
+      box-shadow:0 1px 2px rgba(0,0,0,.08);
+      margin-bottom:18px;
+    }
+
+    .h { font-size:20px; font-weight:800; margin:0 0 8px; }
+    .p { color:var(--hint); margin:6px 0 12px; }
+    .row { display:flex; gap:16px; align-items:flex-start; flex-wrap:wrap; }
+
+    input {
+      border:1px solid #2a3950; background:var(--well); color:var(--ink);
+      border-radius:10px; padding:10px 12px; font-size:14px; outline:none;
+      width: 200px;
+    }
+    input::placeholder { color:#6b85a6; }
+
+    fieldset legend {
+      font-weight:700;
+      color:var(--ink);
+      font-size:16px;
+      padding:0 6px;
+    }
+
+    ul.instructions { margin:0; padding-left:20px; color:var(--hint); }
+    ul.instructions li { margin-bottom:8px; line-height:1.5; }
+    ul.instructions strong { color:var(--ink); }
+    .sub-note { font-size:13px; color:var(--muted); margin:4px 0 10px 0; }
+    pre {
+      background:var(--well);
+      border:1px solid #2a3950;
+      padding:10px 12px;
+      border-radius:8px;
+      font-size:13px;
+      overflow-x:auto;
+      color:#9ec1ff;
+    }
+
+    @media (max-width: 700px) {
+      .topbar { flex-wrap:wrap; }
+      .row { flex-direction:column; align-items:stretch; }
+      input { width: 100%; }
+    }
+  </style>
+</head>
+<body>
+
+  {% include "header2.html" %}
+
+  <div class="wrap">
+    <div class="topbar">
+      <h1>Nutrient Pump Calibration</h1>
+    </div>
+
+    <!-- Calibration tool -->
+    <fieldset>
+      <legend>Calibration tool</legend>
+      <div class="row">
+        <div style="min-width:280px">
+          <div class="badge">Pump A</div><br>
+          <div style="height:8px"></div>
+          <button class="btn" data-prime="A" data-on="1">Prime A ON</button>
+          <button class="btn" data-prime="A" data-on="0">Prime A OFF</button>
+          <div style="height:8px"></div>
+          <input id="A-sec" type="number" min="0" step="0.1" placeholder="Seconds (e.g. 10)">
+          <button class="btn" data-run="A">Run A for seconds</button>
+          <div style="height:8px"></div>
+          <input id="A-ml" type="number" min="0" step="0.1" placeholder="Measured ml">
+          <button class="btn" data-calc="A">Save A calibration</button>
+        </div>
+
+        <div style="min-width:280px">
+          <div class="badge">Pump B</div><br>
+          <div style="height:8px"></div>
+          <button class="btn" data-prime="B" data-on="1">Prime B ON</button>
+          <button class="btn" data-prime="B" data-on="0">Prime B OFF</button>
+          <div style="height:8px"></div>
+          <input id="B-sec" type="number" min="0" step="0.1" placeholder="Seconds (e.g. 10)">
+          <button class="btn" data-run="B">Run B for seconds</button>
+          <div style="height:8px"></div>
+          <input id="B-ml" type="number" min="0" step="0.1" placeholder="Measured ml">
+          <button class="btn" data-calc="B">Save B calibration</button>
+        </div>
+      </div>
+    </fieldset>
+
+    <!-- Instructions -->
+    <fieldset>
+      <legend>Instructions</legend>
+
+      <p class="p"><strong>Purpose:</strong> To determine each pump’s delivery rate in millilitres per second (ml/s) so nutrient dosing can be calculated accurately.</p>
+
+      <ul class="instructions">
+        <li><strong>Step 1 — Prepare setup:</strong> Place each pump’s pickup tube in a clean container of water or nutrient solution, and output tube into a graduated measuring cylinder marked in ml.</li>
+        <li><strong>Step 2 — Prime the line:</strong> Use the <em>Prime ON/OFF</em> buttons to fill the line until liquid flows smoothly with no air bubbles. Turn off once primed.</li>
+        <li><strong>Step 3 — Run a timed test:</strong> Enter a duration (start with <strong>10 s</strong>) and click <em>Run for seconds</em>. Measure how much liquid is dispensed (ml).</li>
+        <li><strong>Step 4 — Save calibration:</strong> Enter the same seconds and measured ml, then click <em>Save Calibration</em> for that pump. The system stores the flow rate in ml/s.</li>
+        <li><strong>Step 5 — Verify consistency:</strong> Repeat 2–3 times per pump until readings stabilise within ±5 % of each other.</li>
+        <li><strong>Step 6 — Confirm calibration file:</strong> The saved data appears in <code>config/nutrient_cal.json</code>:</li>
+      </ul>
+
+      <pre>{
+  "A": {"ml_per_s": 3.6},
+  "B": {"ml_per_s": 4.1}
+}</pre>
+
+      <ul class="instructions">
+        <li><strong>Step 7 — Maintenance tips:</strong> Recalibrate if you replace tubing, pumps, or nutrient type. Always prime before dosing. Temperature and viscosity can slightly affect flow rate.</li>
+      </ul>
+
+      <p class="sub-note">For best accuracy, use at least 50 ml per run, or increase duration to 20–30 s for slow-flow pumps.</p>
+    </fieldset>
+  </div>
+
+  <script>
+  (function(){
+    const $ = s=>document.querySelector(s);
+    const post = async (url, body) =>
+      (await fetch(url,{method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body||{})})).json();
+
+    const PRIME_URL = '/api/nutrient/prime';
+    const RUN_URL   = '/api/nutrient/run';
+    const CALC_URL  = '/api/nutrient/calc';
+
+    document.querySelectorAll('[data-prime]').forEach(btn=>{
+      btn.addEventListener('click', async ()=>{
+        const pump = btn.getAttribute('data-prime');
+        const on = btn.getAttribute('data-on') === '1';
+        await post(PRIME_URL, {pump, on});
+      });
+    });
+
+    document.querySelectorAll('[data-run]').forEach(btn=>{
+      btn.addEventListener('click', async ()=>{
+        const pump = btn.getAttribute('data-run');
+        const sec = parseFloat($('#'+pump+'-sec').value||'0');
+        if(sec>0){
+          await post(RUN_URL, {pump, seconds: sec});
+        }
+      });
+    });
+
+    document.querySelectorAll('[data-calc]').forEach(btn=>{
+      btn.addEventListener('click', async ()=>{
+        const pump = btn.getAttribute('data-calc');
+        const sec = parseFloat($('#'+pump+'-sec').value||'0');
+        const ml  = parseFloat($('#'+pump+'-ml').value||'0');
+        if(sec>0 && ml>0){
+          await post(CALC_URL, {pump, seconds: sec, measured_ml: ml});
+          alert('Calibration saved for pump '+pump);
+        }
+      });
+    });
+  })();
+  </script>
+</body>
+</html>
+
+

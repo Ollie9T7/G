@@ -1,0 +1,617 @@
+<style>
+/* --- shared sizing for header + flashes --- */
+:root { --w: 850px; --pad: 16px; --brand-accent: #ADFB13; }
+
+/* Header wrapper */
+.hdr-wrap { margin:0; padding:0; background:#fff; font-family:system-ui, -apple-system, Segoe UI, Roboto, 'Open Sans', sans-serif }
+
+/* Top dark bar */
+.hdr-top { width:100%; background:#202020; padding:15px 0; }
+.hdr-inner {
+  max-width: var(--w); width:100%; margin:0 auto; padding:0 var(--pad);
+  display:flex; justify-content:space-between; align-items:center;
+  flex-wrap:wrap; gap:8px;
+}
+
+/* Brand */
+.brand { font-size:20px; font-weight:500; color:#fff; margin:0; }
+.brand-accent { color:var(--brand-accent); }
+.brand-muted  { color:#656565; }
+
+/* Live button */
+.live-btn {
+  font-size:13px; font-weight:500; padding:8px 16px;
+  background:#2e2e2e;                 /* grey background */
+  color:var(--brand-accent);           /* green text */
+  border:1px solid var(--brand-accent);
+  border-radius:6px;
+  text-decoration:none; display:inline-flex; align-items:center;
+  justify-content:center; gap:6px;
+  transition: all 0.4s ease;
+}
+
+/* --- Live Dashboard button: Uiverse-inspired glow --- */
+.live-btn.glow {
+  user-select: none;
+  text-shadow: none;
+  box-shadow: none;
+}
+
+/* hover/focus shows green glow with black text */
+.live-btn.glow:hover,
+.live-btn.glow:focus-visible {
+  color: #121212;                      /* black text on hover */
+  background: var(--brand-accent);     /* green background on hover */
+  border: 1px solid var(--brand-accent);
+  text-shadow: 0 0 5px #ffffff, 0 0 10px #ffffff, 0 0 20px #ffffff;
+  box-shadow:
+    0 0 5px var(--brand-accent),
+    0 0 20px var(--brand-accent),
+    0 0 50px var(--brand-accent),
+    0 0 100px var(--brand-accent);
+  outline: none;
+}
+
+/* keyboard focus ring fallback (in case text-shadow glow is subtle) */
+.live-btn.glow:focus-visible {
+  outline: 2px solid #cfe87a;
+  outline-offset: 2px;
+}
+
+/* --- Live icon: aligned solid dot + constant pulse ring, correct colours --- */
+.live-icon {
+  /* colour tokens */
+  --dot-color-default: var(--brand-accent); /* lime */
+  --dot-color-hover: #08b622;               /* original green on hover */
+
+  /* size & alignment */
+  position: relative;
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  margin-right: 2px;
+  vertical-align: middle;
+
+  /* hide the Font Awesome glyph so we draw our own circle */
+  font-size: 0;
+  line-height: 0;
+
+  /* default dot colour variable (overridden on hover) */
+  --dot-color: var(--dot-color-default);
+}
+
+/* Switch the dot colour on hover/focus of the button */
+.live-btn.glow:hover .live-icon,
+.live-btn.glow:focus-visible .live-icon {
+  --dot-color: var(--dot-color-hover);
+}
+
+/* Solid centre dot (always perfectly centred) */
+.live-icon::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 8px;
+  height: 8px;
+  transform: translate(-50%, -50%);
+  background: var(--dot-color);
+  border-radius: 50%;
+  z-index: 1; /* above the ring */
+}
+
+/* Expanding pulse ring (no blur), constantly running */
+.live-icon::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 8px;
+  height: 8px;
+  transform: translate(-50%, -50%) scale(1);
+  background: var(--dot-color);   /* uses the dot colour */
+  border-radius: 50%;
+  opacity: 0.4;
+  z-index: 0;                     /* behind the dot */
+  pointer-events: none;
+  animation: pulseRing 1.8s ease-out infinite;
+}
+
+/* Clean expanding fade-out ring */
+@keyframes pulseRing {
+  0%   { transform: translate(-50%, -50%) scale(1);   opacity: 0.40; }
+  70%  { transform: translate(-50%, -50%) scale(2.4); opacity: 0.00; }
+  100% { transform: translate(-50%, -50%) scale(2.4); opacity: 0.00; }
+}
+
+
+
+
+
+
+
+
+/* Lower bar */
+.hdr-bar { width:100%; background:#303030; padding:7px 0; margin-bottom:40px; }
+
+/* Link groups (desktop/tablet) */
+.links-left, .links-right { display:flex; gap:10px; }
+.links-left { align-items:center; }
+.links-left a { font-size:12px; text-decoration:none; color:#888888; }
+.links-left a:hover { color:#bebebe; transition:.3s ease-out; }
+
+/* Right-side 'Log' (desktop/tablet) */
+.nav-link {
+  font-size:12px; padding:5px 10px;
+  background:#303030; color:#888888;
+  border:1px solid #3a3a3a; border-radius:4px;
+  text-decoration:none; display:inline-flex; align-items:center;
+}
+.nav-link:hover { color:#bebebe; background:#2a2a2a; transition:.2s ease-out; }
+
+/* ===== Dropdowns (desktop/tablet) ===== */
+.nav-dropdown { position:relative; }
+.nav-dropbtn {
+  font-size:12px; padding:5px 10px;
+  background:#262626; color:#888888;
+  border:1px solid #3a3a3a; border-radius:4px;
+  cursor:pointer; text-decoration:none;
+}
+.nav-dropbtn:hover { color:#bebebe; background:#2a2a2a; transition:.2s ease-out; }
+.nav-dropdown-menu {
+  display:none; position:absolute; top:100%; left:0;
+  background:#1f1f1f; min-width:180px; border-radius:6px;
+  box-shadow:0 8px 16px rgba(0,0,0,0.35);
+  overflow:hidden; z-index:9999;
+}
+.nav-dropdown-menu a {
+  display:block; padding:10px 12px; font-size:12px;
+  color:#eaeaea; text-decoration:none;
+}
+/* fix: valid color token */
+.nav-dropdown-menu a:hover { background:#2a2a2a; }
+.nav-dropdown:hover .nav-dropdown-menu { display:block; }
+
+/* ---------- Mobile menu trigger ---------- */
+.mobile-trigger { display:none; }
+.mobile-menu-btn {
+  display:inline-flex; align-items:center; justify-content:center;
+  font-size:14px; padding:8px 14px; border-radius:6px;
+  background:#262626; color:#eaeaea; border:1px solid #3a3a3a;
+}
+
+/* ---------- Bottom-sheet mobile menu ---------- */
+.mobile-menu-overlay {
+  position:fixed; inset:0; z-index:10000;
+  background:rgba(0,0,0,0.55);
+  opacity:0; pointer-events:none; transition:opacity 220ms ease;
+}
+.mobile-menu-overlay.open { opacity:1; pointer-events:auto; }
+
+.mobile-sheet {
+  position:absolute; left:0; right:0; bottom:0;
+  height:80vh; max-height:80vh;
+  background:#14161b; color:#eaeaea;
+  border-top-left-radius:16px; border-top-right-radius:16px;
+  transform:translateY(100%);
+  transition:transform 260ms cubic-bezier(.22,.61,.36,1);
+  display:flex; flex-direction:column;
+  padding-bottom:calc(env(safe-area-inset-bottom, 0px));
+}
+.mobile-menu-overlay.open .mobile-sheet { transform:translateY(0); }
+
+.mobile-menu-header {
+  display:flex; justify-content:space-between; align-items:center;
+  padding:10px var(--pad) 12px var(--pad);
+  background:#1b1e25;
+  border-bottom:1px solid #2c3140;
+  border-top-left-radius:16px; border-top-right-radius:16px;
+}
+.mobile-menu-title { margin:0; font-size:16px; font-weight:700; letter-spacing:.2px; }
+
+.mobile-menu-close {
+  background:none; border:1px solid #3a3a3a; color:#eaeaea;
+  width:36px; height:36px; border-radius:8px; cursor:pointer;
+  display:inline-flex; align-items:center; justify-content:center;
+  font-size:20px; line-height:1; padding:0;
+}
+.mobile-menu-close:focus-visible { outline:2px solid var(--brand-accent); outline-offset:2px; }
+
+.mobile-menu-body {
+  padding:12px var(--pad); display:flex; flex-direction:column; gap:12px;
+  overflow:auto;
+}
+
+/* Collapsible sections */
+.mm-section {
+  border:1px solid #2c3140; border-radius:10px;
+  background:#1b1f27;
+}
+.mm-section > summary {
+  list-style:none; cursor:pointer; padding:12px 14px;
+  font-size:14px; font-weight:700; color:#f2f6ff; text-transform:normal;
+  letter-spacing:.4px;
+}
+.mm-section > summary::-webkit-details-marker { display:none; }
+.mm-section[open] > summary {
+  background:#222733;
+  border-bottom:1px solid #2c3140;
+  border-radius:10px 10px 0 0;
+}
+
+/* Option links */
+.mm-links { display:flex; flex-direction:column; }
+.mm-links a {
+  padding:12px 14px; text-decoration:none; font-size:14px; font-weight:500;
+  color:#e7ebf5;
+  background:#171b22;
+  border-left:3px solid transparent;
+}
+.mm-links a + a { border-top:1px solid #2c3140; border-radius:0 0 10px 10px;}
+.mm-links a:hover {
+  background:#2a3140;
+  border-left-color:var(--brand-accent);
+}
+
+/* Standalone link inside menu */
+.mm-link {
+  border:1px solid #2c3140; border-radius:10px; padding:12px 14px;
+  text-decoration:none; color:#e7ebf5; font-size:15px; font-weight:600;
+  background:#222733;
+}
+.mm-link:hover { background:#2a3140; }
+
+/* ---------- Responsive ---------- */
+@media (max-width: 900px) {
+  .brand { font-size:18px; }
+  .live-btn { font-size:12px; padding:7px 14px; }
+  .hdr-inner { padding:0 12px; } /* small-screen side padding */
+}
+@media (max-width: 600px) {
+  .links-left, .links-right { display:none !important; }
+  .mobile-trigger { display:block; }
+  .hdr-bar .hdr-inner { justify-content:space-between; }
+  .hdr-inner { padding:0 12px; }
+}
+
+/* ===== Font Awesome chevrons for mobile menu summaries ===== */
+.mobile-menu-body .mm-section > summary {
+  display:flex; align-items:center; justify-content:space-between; padding-right:14px;
+}
+.mobile-menu-body .mm-section > summary::after {
+  content:"\f054";
+  font-family:"Font Awesome 6 Free","Font Awesome 5 Free";
+  font-weight:900;
+  font-size:14px; line-height:1;
+  color:#f2f6ff;
+  transition:transform 200ms ease;
+  margin-left:10px;
+}
+.mobile-menu-body .mm-section[open] > summary::after { transform:rotate(90deg); }
+
+/* ===== Flash banner (now matches header width & side padding) ===== */
+.flashes {
+  list-style:none;
+  margin:-40px 0 40px 0;           /* preserves your overlap with .hdr-bar */
+  padding:0;                       /* side padding comes from the <li> below */
+  background:var(--brand-accent);
+  width:100%;
+}
+.flashes li {
+  max-width: var(--w);
+  margin:0 auto;
+  padding:10px var(--pad);         /* same side padding as .hdr-inner */
+  color:#000;
+  display:flex; align-items:center;
+  font-size:13px;
+}
+
+/* ---------- Space between icon and words in menu ---------- */
+.nav-dropdown-menu i {
+  margin-right: 6px;
+  color:var(--brand-accent);
+}
+</style>
+
+
+
+
+<div class="hdr-wrap">
+  <div class="hdr-top">
+    <div class="hdr-inner">
+      <p class="brand">
+        Grow<span class="brand-accent">Stuff</span><span class="brand-muted"> | Experimental</span>
+      </p>
+      <a href="/" class="live-btn glow">
+        <i class="fas fa-circle live-icon"></i> Live Dashboard
+      </a>
+    </div>
+  </div>
+
+  <div class="hdr-bar">
+    <div class="hdr-inner">
+      <!-- LEFT (desktop/tablet) -->
+      <div class="links-left">
+        
+
+        <!-- Profiles dropdown -->
+        <div class="nav-dropdown">
+          <button class="nav-dropbtn" type="button">Profiles ▾</button>
+          <div class="nav-dropdown-menu">
+            <a href="/new"><i class="fa-solid fa-plus"></i>Create New Profile</a>
+            <a href="/profiles"><i class="fa-solid fa-eye"></i>View Existing Profiles</a>
+            <a href="/archive"><i class="fa-solid fa-box-archive"></i>Profile Archive</a>
+          </div>
+        </div>
+        
+        <!-- Functions dropdown -->
+        <div class="nav-dropdown">
+          <button class="nav-dropbtn" type="button">Functions ▾</button>
+          <div class="nav-dropdown-menu">
+            <a href="/">Manual Override</a>
+            <a href="/reservoirs">Reservoir Management</a>
+          </div>
+        </div>
+        
+        <!-- Settings dropdown -->
+        <div class="nav-dropdown">
+          <button class="nav-dropbtn" type="button">Settings ▾</button>
+          <div class="nav-dropdown-menu">
+            <a href="/settings/global">Global Settings</a>
+            <a href="/settings/scale">Scale Settings</a>
+            <a href="/reservoirs/calibration">Nutrient Pump Calibration</a>
+          </div>
+        </div>
+      </div>
+
+      <!-- Mobile trigger (shown only ≤600px) -->
+      <div class="mobile-trigger">
+        <button id="mobileMenuBtn" class="mobile-menu-btn" type="button"
+                aria-controls="mobileMenu" aria-expanded="false">Menu</button>
+      </div>
+
+      <!-- RIGHT (desktop/tablet) -->
+      <div class="links-right">
+
+
+        <a href="/logs" class="nav-link">Log</a>
+      </div>
+    </div>
+  </div>
+
+  {% with messages = get_flashed_messages() %}
+    {% if messages %}
+      <ul class="flashes">
+        {% for message in messages %}
+          <li>
+            <i class="fas fa-check-circle" style="color:#000; margin-right:4px;"></i>
+            {{ message }}
+          </li>
+        {% endfor %}
+      </ul>
+    {% endif %}
+  {% endwith %}
+</div>
+
+<!-- Bottom-sheet Mobile Menu -->
+<div id="mobileMenu" class="mobile-menu-overlay" role="dialog" aria-modal="true" aria-labelledby="mobileMenuTitle">
+  <div class="mobile-sheet">
+    <div class="mobile-menu-header">
+      <h2 class="mobile-menu-title" id="mobileMenuTitle">Menu</h2>
+      <!-- changed: larger X only -->
+      <button id="mobileMenuClose" class="mobile-menu-close" type="button" aria-label="Close menu">✕</button>
+    </div>
+    <nav class="mobile-menu-body">
+      <details class="mm-section">
+        <summary>Functions</summary>
+        <div class="mm-links">
+          <a href="/">Manual Override</a>
+          <a href="/reservoirs">Reservoir Management</a>
+        </div>
+      </details>
+
+      <details class="mm-section">
+        <summary>Profiles</summary>
+        <div class="mm-links">
+          <a href="/new">Create New Profile</a>
+          <a href="/profiles">View Existing Profiles</a>
+          <a href="/archive">Profile Archive</a>
+        </div>
+      </details>
+
+      <details class="mm-section">
+        <summary>Settings</summary>
+        <div class="mm-links">
+          <a href="/settings/global">Global Settings</a>
+          <a href="/settings/scale">Scale Settings</a>
+          <a href="/reservoirs/calibration">Nutrient Pump Calibration</a>
+        </div>
+      </details>
+
+      <a href="/log" class="mm-link">Log</a>
+    </nav>
+  </div>
+</div>
+
+
+
+
+
+<script>
+/* ===========================
+   (1) Your existing mobile menu
+   =========================== */
+(function () {
+  const btn = document.getElementById('mobileMenuBtn');
+  const menu = document.getElementById('mobileMenu');
+  const closeBtn = document.getElementById('mobileMenuClose');
+  if (!menu) return;
+  const sheet = menu.querySelector('.mobile-sheet');
+
+  function openMenu() {
+    menu.classList.add('open');
+    menu.setAttribute('aria-hidden', 'false');
+    btn && btn.setAttribute('aria-expanded', 'true');
+    document.documentElement.style.overflow = 'hidden';
+    document.body.style.overflow = 'hidden';
+  }
+
+  function closeMenu() {
+    menu.classList.remove('open');
+    menu.setAttribute('aria-hidden', 'true');
+    btn && btn.setAttribute('aria-expanded', 'false');
+    document.documentElement.style.overflow = '';
+    document.body.style.overflow = '';
+  }
+
+  btn && btn.addEventListener('click', openMenu);
+  closeBtn && closeBtn.addEventListener('click', closeMenu);
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && menu.classList.contains('open')) closeMenu();
+  });
+
+  menu.addEventListener('click', (e) => {
+    if (!sheet.contains(e.target)) closeMenu();
+  }, false);
+})();
+
+/* ===========================
+   (2) Alarm using a real audio file
+   - Put your file at: /static/audio/audio-file.mp3 (or change ALARM_SRC)
+   - Repeats every 10s while a hard error persists
+   - Only plays when tab is visible and user has interacted once (browser policy)
+   =========================== */
+(function () {
+  // --- Configure this path to your file ---
+  const ALARM_SRC = '/static/audio/death-star.mp3';
+
+  // Timing
+  const REPEAT_EVERY_MS = 10000;   // how often to re-trigger while error persists
+  const PLAY_FOR_MS = null;        // set a number to forcibly stop early (e.g., 3200), or null to let clip play fully
+  const VOLUME = 0.9;              // 0..1
+
+  // Media element (no markup needed — we inject it)
+  const alarm = new Audio(ALARM_SRC);
+  alarm.preload = 'auto';
+  alarm.loop = false;              // we control repeats ourselves
+  alarm.volume = VOLUME;
+  // If the audio file is on another domain and sends CORS headers:
+  // alarm.crossOrigin = 'anonymous';
+
+  // Browser autoplay unlock
+  let audioUnlocked = false;
+  async function primeAudio() {
+    if (audioUnlocked) return;
+    try {
+      alarm.muted = true;
+      await alarm.play();          // first gesture-driven play
+      alarm.pause();
+      alarm.currentTime = 0;
+      alarm.muted = false;
+      audioUnlocked = true;
+      // remove listeners once unlocked
+      ['click','touchstart','keydown'].forEach(ev => document.removeEventListener(ev, primeAudio));
+    } catch (e) {
+      // silently ignore until the next user gesture
+    }
+  }
+  ['click','touchstart','keydown'].forEach(ev => document.addEventListener(ev, primeAudio, {passive:true}));
+
+  // Play one burst
+  function playBurst() {
+    if (document.hidden || !audioUnlocked) return;
+    try {
+      // retrigger cleanly
+      alarm.pause();
+      alarm.currentTime = 0;
+      alarm.play();
+      if (typeof PLAY_FOR_MS === 'number' && PLAY_FOR_MS > 0) {
+        setTimeout(() => { try { alarm.pause(); } catch(e){} }, PLAY_FOR_MS);
+      }
+    } catch (e) {
+      // ignore
+    }
+  }
+
+  // Poll /status.json to decide if we should sound the alarm
+  let pollTimer = null;
+  let burstTimer = null;
+  let hardErrorActive = false;
+
+  function hasHardError(payload) {
+    // Treat any last_error as requiring intervention; also consider reservoir cutoff.
+    const le = (payload && payload.last_error) ? String(payload.last_error) : '';
+    const cutoff = String(payload && payload.reservoir_status || '').toLowerCase() === 'cutoff';
+    return Boolean(le) || cutoff;
+  }
+
+  function startBurstLoop() {
+    stopBurstLoop();
+    playBurst(); // immediate
+    burstTimer = setInterval(() => {
+      if (!document.hidden && hardErrorActive) playBurst();
+    }, REPEAT_EVERY_MS);
+  }
+
+  function stopBurstLoop() {
+    if (burstTimer) clearInterval(burstTimer);
+    burstTimer = null;
+    try { alarm.pause(); } catch (e) {}
+  }
+
+  async function poll() {
+    try {
+      const res = await fetch('/status.json', { cache: 'no-store' });
+      if (!res.ok) throw new Error('status not ok');
+      const data = await res.json();
+
+      const isHard = hasHardError(data);
+      if (isHard && !hardErrorActive) {
+        hardErrorActive = true;
+        if (audioUnlocked && !document.hidden) startBurstLoop();
+      } else if (!isHard && hardErrorActive) {
+        hardErrorActive = false;
+        stopBurstLoop();
+      }
+
+      // If tab just became visible and error persists, ensure loop is running
+      if (isHard && audioUnlocked && !document.hidden && !burstTimer) {
+        startBurstLoop();
+      }
+    } catch (e) {
+      // ignore transient failures
+    }
+  }
+
+  // Start polling and visibility handling
+  pollTimer = setInterval(poll, 2500);
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) {
+      poll(); // re-check immediately on return
+    } else {
+      // Pause sound if user switches away
+      try { alarm.pause(); } catch (e) {}
+    }
+  });
+})();
+</script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

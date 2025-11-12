@@ -1,0 +1,356 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Global Settings</title>
+  
+  <!-- fonts & icons -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Open+Sans:ital,wght@0,300..800;1,300..800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root{
+    --bg:#0b0f14; --card:#121925; --muted:#2a3950; --text:#e7eef7; --sub:#e7eef7; --hint:#9bb4d3;
+    --brand:#1e5cff;
+    --label-col: 280px; /* label column width on desktop */
+    --radius: 8px;
+    --pad: 14px;
+    --section-gap: 26px; /* space between fieldsets */
+    --w: 850px; /* align with other pages */
+  }
+
+  *,*::before,*::after{ box-sizing: border-box; }
+  html,body{height:100%; margin:0; padding:0;}
+  body {
+    font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+    background: var(--bg); color: var(--text); margin: 0;
+  }
+
+  /* Constrain the included header to the same content width (no style changes) */
+  header, .header2, .site-header, nav.header, nav.top, .topnav {
+    max-width: var(--w);
+    margin: 0 auto;
+    padding: 0 var(--pad);
+  }
+
+  .container {
+    max-width: var(--w);
+    width: 100%;
+    margin: 28px auto 64px;
+    padding: 0 var(--pad) 50px;
+  }
+
+  .header {
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    margin: 0 0 32px 0;
+    flex-wrap: wrap;
+  }
+  .header-left { display:flex; align-items:center; gap:12px; }
+  .header h1 { margin: 0; font-size: 24px; font-weight: 600; }
+
+  .nav, button {
+    padding: 10px 14px; border-radius: var(--radius); border: 1px solid var(--muted);font-size:13px;
+    background: var(--card); color: #ddd; text-decoration: none; cursor: pointer;
+  }
+  button { background: var(--brand); color:#fff; border:none!important; }
+
+  form { display: grid; gap: var(--section-gap); }
+
+  fieldset {
+    border: 1px solid var(--muted); border-radius: var(--radius); padding: var(--pad);
+    background: var(--card);
+  }
+  legend { color: var(--sub); padding: 0 6px; }
+
+  .row {
+    display: grid; grid-template-columns: var(--label-col) 1fr;
+    gap: 12px; align-items: center; margin: 8px 0;
+  }
+  .row > *:last-child { min-width: 0; }
+  label { color: #e7eef7; line-height: 1.2; }
+
+  input {
+    width: 100%; max-width: 100%; padding: 10px 12px; border-radius: 10px;
+    border: 1px solid var(--muted); background: #0d1420; color: #e7eef7;
+  }
+  input[type="number"]{ font-variant-numeric: tabular-nums; }
+
+  input[type="checkbox"]{
+    width: auto; height: auto; padding: 0; margin: 0;
+    justify-self: start; align-self: center; border: none;
+    background: transparent;
+  }
+
+  .hint { color: var(--hint); font-size: 12px; margin-top: 6px; }
+
+  .btnbar { display:flex; gap:10px; justify-content:flex-start; margin-top: 2px; }
+  .btnbar.right { justify-content:flex-end; }
+  @media (max-width: 700px){
+    .btnbar { flex-wrap: wrap; }
+  }
+
+  @media (max-width: 640px){
+    .row { grid-template-columns: 1fr; }
+    :root{ --label-col: 100%; }
+  }
+  
+  .page-description {
+  margin: 0 0 28px 0;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--hint);
+}
+
+</style>
+</head>
+<body>
+  {% include "header2.html" %}
+	
+  <div class="container">
+    <div class="header">
+      <div class="header-left">
+        <a class="nav" href="/">← Back</a>
+        <h1>Global Settings</h1>
+      </div>
+      <div class="btnbar">
+        <button type="submit" form="settings-form">Save settings</button>
+        <a class="nav" href="{{ request.referrer or url_for('settings_global') }}">Refresh</a>
+      </div>
+    </div>
+    
+    <!-- Page description -->
+<div class="page-description">
+  <p>
+    Global settings define system-wide behaviour that applies across all grow profiles. 
+    Adjust these values to control safety thresholds, hysteresis buffers, and hardware behaviour 
+    such as the agitator pre-mix. These apply at all times, regardless of which profile is running.
+  </p>
+</div>
+
+
+    <form id="settings-form" method="post" action="">
+      <fieldset>
+  <legend>Hysteresis</legend>
+
+  <!-- Device-specific (recommended) -->
+  <div class="hint" style="margin:-4px 0 12px 0;">
+    Set per-device deadbands here. These values take priority. If a device value isn’t set,
+    the global fallbacks below will be used instead.
+  </div>
+
+  <div class="row">
+    <label for="hysteresis_temp_heater_c">Heater temperature hysteresis (°C)</label>
+    <input id="hysteresis_temp_heater_c" name="hysteresis_temp_heater_c" type="number" step="0.1"
+           value="{{ (s.hysteresis_temp_heater_c
+                       if s.hysteresis_temp_heater_c is not none
+                       else (s.hysteresis_temp_c if s.hysteresis_temp_c is not none else 1.0)) }}">
+  </div>
+
+  <div class="row">
+    <label for="hysteresis_temp_extractor_c">Extractor temperature hysteresis (°C)</label>
+    <input id="hysteresis_temp_extractor_c" name="hysteresis_temp_extractor_c" type="number" step="0.1"
+           value="{{ (s.hysteresis_temp_extractor_c
+                       if s.hysteresis_temp_extractor_c is not none
+                       else (s.hysteresis_temp_c if s.hysteresis_temp_c is not none else 1.0)) }}">
+  </div>
+
+  <div class="row">
+    <label for="hysteresis_humidity_humidifier_pct">Humidifier humidity hysteresis (%RH)</label>
+    <input id="hysteresis_humidity_humidifier_pct" name="hysteresis_humidity_humidifier_pct"
+           type="number" step="0.1"
+           value="{{ (s.hysteresis_humidity_humidifier_pct
+                       if s.hysteresis_humidity_humidifier_pct is not none
+                       else (s.hysteresis_humidity_pct if s.hysteresis_humidity_pct is not none else 2.0)) }}">
+  </div>
+
+  <div class="row">
+    <label for="hysteresis_humidity_extractor_pct">Extractor humidity hysteresis (%RH)</label>
+    <input id="hysteresis_humidity_extractor_pct" name="hysteresis_humidity_extractor_pct"
+           type="number" step="0.1"
+           value="{{ (s.hysteresis_humidity_extractor_pct
+                       if s.hysteresis_humidity_extractor_pct is not none
+                       else (s.hysteresis_humidity_pct if s.hysteresis_humidity_pct is not none else 2.0)) }}">
+  </div>
+
+  <!-- Divider + fallback explanation -->
+  <hr style="border:none; border-top:1px solid var(--muted); margin:14px 0;">
+
+  <div class="hint" style="margin:-2px 0 8px 0;">
+    <strong>Fallback hysteresis (legacy/global):</strong>
+    These are only used when a device-specific value above is not set. Prefer setting the per-device fields.
+  </div>
+
+  <div class="row">
+    <label for="hysteresis_temp_c">Global temperature hysteresis (°C)</label>
+    <input id="hysteresis_temp_c" name="hysteresis_temp_c" type="number" step="0.1" value="{{ s.hysteresis_temp_c }}">
+  </div>
+
+  <div class="row">
+    <label for="hysteresis_humidity_pct">Global humidity hysteresis (%RH)</label>
+    <input id="hysteresis_humidity_pct" name="hysteresis_humidity_pct" type="number" step="0.1" value="{{ s.hysteresis_humidity_pct }}">
+  </div>
+</fieldset>
+
+
+
+
+      
+      <fieldset>
+        <legend>Agitator (pre-mix)</legend>
+        <div class="row">
+          <label for="agitator_enabled">Enable agitator pre-mix</label>
+          <input id="agitator_enabled" name="agitator_enabled" type="checkbox" value="1"
+                 {{ 'checked' if s.get('agitator_enabled') else '' }}>
+        </div>
+        <div class="row">
+          <label for="agitator_run_sec">Agitator run time (s)</label>
+          <input id="agitator_run_sec" name="agitator_run_sec" type="number" step="1" min="0"
+                 value="{{ s.agitator_run_sec if s.agitator_run_sec is not none else 15 }}">
+        </div>
+        <div class="hint">
+          Example: run 15 s → agitator pump turns on 15 s before irrigation and stops when the main irrigation starts.
+        </div>
+      </fieldset>
+
+      <!-- ★★★ NEW SECTION: Air Pump (pre-mix) ★★★ -->
+      <fieldset>
+        <legend>Air Pump (pre-mix)</legend>
+        <div class="row">
+          <label for="air_pump_enabled">Enable air pump pre-mix</label>
+          <input id="air_pump_enabled" name="air_pump_enabled" type="checkbox" value="1"
+                 {{ 'checked' if s.get('air_pump_enabled') else '' }}>
+        </div>
+        <div class="row">
+          <label for="air_pump_run_sec">Air pump run time (s)</label>
+          <input id="air_pump_run_sec" name="air_pump_run_sec" type="number" step="1" min="0"
+                 value="{{ s.air_pump_run_sec if s.air_pump_run_sec is not none else 15 }}">
+        </div>
+        <div class="hint">
+          Example: run 15 s → air pump turns on 15 s before irrigation and stops when the main irrigation starts.
+        </div>
+      </fieldset>
+      <!-- ★★★ END NEW SECTION ★★★ -->
+
+      <fieldset>
+        <legend>Anti Short-Cycle (Minimum ON time)</legend>
+        <div class="row">
+          <label for="heater_min_on_s">Heater min ON (s)</label>
+          <input id="heater_min_on_s" name="heater_min_on_s" type="number" step="1" value="{{ s.heater_min_on_s }}">
+        </div>
+        <div class="row">
+          <label for="fan_min_on_s">Fan min ON (s)</label>
+          <input id="fan_min_on_s" name="fan_min_on_s" type="number" step="1" value="{{ s.fan_min_on_s }}">
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Absolute Safety Limits</legend>
+        <div class="row">
+          <label for="water_temp_min_c">Water temp min (°C)</label>
+          <input id="water_temp_min_c" name="water_temp_min_c" type="number" step="0.1"
+                 value="{{ s.water_temp_min_c if s.water_temp_min_c is not none else '' }}">
+        </div>
+        <div class="row">
+          <label for="water_temp_max_c">Water temp max (°C)</label>
+          <input id="water_temp_max_c" name="water_temp_max_c" type="number" step="0.1"
+                 value="{{ s.water_temp_max_c if s.water_temp_max_c is not none else '' }}">
+        </div>
+        <div class="row">
+          <label for="absolute_temp_min_c">Air temp min (°C)</label>
+          <input id="absolute_temp_min_c" name="absolute_temp_min_c" type="number" step="0.1" value="{{ s.absolute_temp_min_c }}">
+        </div>
+        <div class="row">
+          <label for="absolute_temp_max_c">Air temp max (°C)</label>
+          <input id="absolute_temp_max_c" name="absolute_temp_max_c" type="number" step="0.1" value="{{ s.absolute_temp_max_c }}">
+        </div>
+        <div class="row">
+          <label for="absolute_humidity_min_pct">Humidity min (%RH)</label>
+          <input id="absolute_humidity_min_pct" name="absolute_humidity_min_pct" type="number" step="0.1" value="{{ s.absolute_humidity_min_pct }}">
+        </div>
+        <div class="row">
+          <label for="absolute_humidity_max_pct">Humidity max (%RH)</label>
+          <input id="absolute_humidity_max_pct" name="absolute_humidity_max_pct" type="number" step="0.1" value="{{ s.absolute_humidity_max_pct }}">
+        </div>
+        <div class="hint">If readings go outside these, controls are cut and an alert is raised.</div>
+      </fieldset>
+
+      <!-- ★★★ NEW SECTION: Water Temperature ★★★ -->
+      <fieldset>
+        <legend>Water Temperature</legend>
+
+        <div class="row">
+          <label for="water_temp_target_c">Water temp target (°C)</label>
+          <input id="water_temp_target_c" name="water_temp_target_c" type="number" step="0.1"
+                 value="{{ s.water_temp_target_c if s.water_temp_target_c is not none else '' }}">
+        </div>
+
+        <div class="hint">Used for display/banners, does not control shutdown.</div>
+      </fieldset>
+      <!-- ★★★ END NEW SECTION ★★★ -->
+
+      <fieldset>
+        <legend>Reservoir</legend>
+
+        <div class="row">
+          <label for="reservoir_empty_weight_kg">Empty gross weight (kg)</label>
+          <input id="reservoir_empty_weight_kg" name="reservoir_empty_weight_kg" type="number" step="0.1" value="{{ s.reservoir_empty_weight_kg }}">
+        </div>
+        <div class="hint">Gross weight of the reservoir hardware with no water. Used to subtract and calculate net water weight.</div>
+
+        <div class="row">
+          <label for="reservoir_full_capacity_kg">Full capacity (kg of water)</label>
+          <input id="reservoir_full_capacity_kg" name="reservoir_full_capacity_kg" type="number" step="0.1" value="{{ s.reservoir_full_capacity_kg }}">
+        </div>
+        <div class="hint">Net water at your “full” line (no hardware included). The app derives gross full = empty gross + this capacity.</div>
+
+
+        <div class="row">
+          <label for="reservoir_half_water_kg">Half – kg of water remaining</label>
+          <input id="reservoir_half_water_kg" name="reservoir_half_water_kg" type="number" step="0.1" value="{{ s.reservoir_half_water_kg }}">
+        </div>
+        <div class="hint">Water mass at which the UI will display the status “Half”. Usually ~50% of usable capacity.</div>
+
+        <div class="row">
+          <label for="reservoir_low_water_kg">Low – kg of water remaining</label>
+          <input id="reservoir_low_water_kg" name="reservoir_low_water_kg" type="number" step="0.1" value="{{ s.reservoir_low_water_kg }}">
+        </div>
+        <div class="hint">Threshold for “Low” status. Indicates water is running down but still above critical/cutoff.</div>
+
+        <div class="row">
+          <label for="reservoir_critical_water_kg">Critical – kg of water remaining</label>
+          <input id="reservoir_critical_water_kg" name="reservoir_critical_water_kg" type="number" step="0.1" value="{{ s.reservoir_critical_water_kg }}">
+        </div>
+        <div class="hint">Threshold for “Critical” status. Warning only — does not stop the pump. Set higher than cutoff to give early notice.</div>
+
+        <div class="row">
+          <label for="reservoir_pump_cutoff_water_kg">Pump cutoff – kg of water remaining</label>
+          <input id="reservoir_pump_cutoff_water_kg" name="reservoir_pump_cutoff_water_kg" type="number" step="0.1" value="{{ s.reservoir_pump_cutoff_water_kg }}">
+        </div>
+        <div class="hint">Safety shutdown threshold. If water falls below this, the pump is shutdown, all outputs are stopped, and an alert is raised via Discord.</div>
+
+        <div class="row">
+          <label for="reservoir_full_margin_kg">Full margin (kg)</label>
+          <input id="reservoir_full_margin_kg" name="reservoir_full_margin_kg" type="number" step="0.1" value="{{ s.reservoir_full_margin_kg }}">
+        </div>
+        <div class="hint">Margin for showing “Full”. Example: if usable = 20 kg and margin = 1 kg, the UI shows “Full” down to 19 kg to avoid flicker.</div>
+
+        <div class="hint">
+          All thresholds are in <b>kg of water</b> (gross weight − empty weight).  
+          “Critical” gives a warning; “Cutoff” actually stops pump cycles and raises an alert.
+        </div>
+      </fieldset>
+
+      <div class="btnbar right">
+        <button type="submit">Save settings</button>
+        <a class="nav" href="{{ request.referrer or url_for('settings_global') }}">Refresh</a>
+      </div>
+    </form>
+  </div>
+</body>
+</html>
+
+
+

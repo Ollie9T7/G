@@ -1,0 +1,1203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>GrowStuff Dashboard</title>
+
+  <!-- fonts & icons -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Open+Sans:ital,wght@0,300..800;1,300..800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+
+  <!-- responsive like your good page -->
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <style>
+    :root { --w: 850px; --pad: 16px; }
+
+    /* normalise sizing + margins */
+    *, *::before, *::after { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; }
+
+    /* layout */
+    .container {
+      max-width: var(--w);
+      margin: 28px auto;
+      padding: 0 var(--pad);
+      display:flex; flex-direction:column; gap:10px;
+    }
+    .card-grid { display:grid; grid-template-columns:repeat(2,1fr); gap:10px; background:#f3f3f3; padding:10px; border-radius:15px; }
+
+    body {
+      font-family: 'Open Sans', sans-serif;
+      background: #fff;
+    }
+
+    /* cards */
+    .card             { padding:15px; background:#fff; border:2px solid #f3f3f3; border-radius:10px; text-align:center; }
+    .card.out-of-range{ border-color:red; animation:flash 1s infinite; }
+    .card.null        { border-color:#ccc !important; animation:none !important; }
+
+    .card-value       { font-size:45px; margin:25px 0; font-weight:500; }
+    .card-meta        { display:flex; justify-content:space-between; font-size:12px; color:#666; }
+    .sub-readings     { display:flex; justify-content:space-around; font-size:12px; color:#666; margin:-6px 0 10px; }
+    .unit             { font-size:0.8em; color:#b8b8b8; margin-left:2px; }
+
+    /* headers & badges */
+    .card-header { text-align:left; font-weight:600; }
+    .badge        { float:right; padding:2px 6px; border-radius:5px; font-size:12px; }
+    .badge.ok     { background-color:#ADFB13 !important; color:#121212 !important; animation:none !important; }
+    .badge.warn   { background-color:#ffcccc !important; color:#121212 !important; animation:flash 1s infinite !important; }
+    .badge.null   { background:#ccc !important; color:#666 !important; animation:none !important; }
+    .badge.softwarn { background-color:#ffb743 !important; color:#121212 !important; animation:none !important; }
+
+    @keyframes flash { 0%,100% {opacity:1} 50% {opacity:0.2} }
+
+    /* ===== Info bubbles ===== */
+    .bubbles-row { display:flex; gap:10px; margin-bottom:5px; padding-bottom:15px; border-bottom:1px solid #f3f3f3; }
+    .bubble {
+      display:flex; align-items:center; gap:12px;
+      flex:1 1 0; min-width:0;
+      padding:10px 10px; border-radius:8px; border:1px solid #ddd;
+      background:#f7f7f7; color:#121212;
+      transition: background-color .2s ease, color .2s ease, border-color .2s ease;
+    }
+    .bubble .label { font-size:13px; font-weight:700; opacity:.85; flex:0 0 auto; }
+    .bubble .value-wrap { flex:1 1 auto; text-align:right; min-width:0; }
+    .bubble .value { font-size:16px; font-weight:700; line-height:1.2; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .bubble .subvalue { font-size:12px; margin-top:2px; opacity:.9; }
+    .bubble--ok      { background:#f3f3f3; border-color:#c9c9c9; color:#292929; }
+    .bubble--warning { background:#fff4cc; border-color:#ffe08a; color:#5a4300; }
+    .bubble--error   { background:#ffe6e6; border-color:#ffb3b3; color:#5a0000; }
+    .bubble--neutral { background:#f3f3f3; border-color:#ddd;    color:#121212; }
+
+    /* ===== System Status banner ===== */
+    .system-message {
+      position:relative; padding:18px 10px; border-radius:8px;
+      border:1px solid transparent; transition:background-color .2s ease, color .2s ease, border-color .2s ease;
+    }
+    .system-message .banner-body { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-top:0; }
+    .system-message .banner-label { font-size:13px; font-weight:700; opacity:.95; flex:0 0 auto; display:flex; align-items:center; }
+    .status-icon { display:inline-flex; align-items:center; justify-content:center; margin-right:8px; font-size:16px; line-height:1; }
+    .system-message .banner-value {
+      flex:1 1 auto; text-align:right; font-size:clamp(13px, 2.2vw, 15px); line-height:1.2; font-weight:600;
+      color:inherit; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-height:20px;
+    }
+    .system-message.banner--ok      { background:#e7f8e7; border-color:#bde7bd; color:#0b3d0b; }
+    .system-message.banner--info    { background:#e6f2ff; border-color:#bcd7ff; color:#0a2b57; }
+    .system-message.banner--warning { background:#fff4cc; border-color:#ffe08a; color:#5a4300; }
+    .system-message.banner--error   { background:#ffe6e6; border-color:#ffb3b3; color:#5a0000; }
+
+    /* ===== Sections ===== */
+    .section-box { overflow:hidden; border:1px solid #ddd; border-radius:10px; margin-top:10px; }
+    .section-header { display:flex; justify-content:space-between; align-items:center; padding:10px 15px; color:#fff; font-weight:700; font-size:14px; }
+    .section-header--status   { background:#4CAF50; }
+    .section-header--log      { background:#0171E3; }
+    .section-header--settings { background:#121212; }
+
+    .section-box table { width:100%; font-size:13px; color:#121212; border-collapse:collapse; border-spacing:0; }
+    .section-box table tr:nth-child(even) { background:#f9f9f9; }
+    .section-box table td { padding:6px 12px; }
+    .section-btn { padding:4px 10px; font-size:12px; background:#fff; color:#121212; border:none; border-radius:4px; cursor:pointer; }
+
+    /* ===== Active Profile Control Card ===== */
+    :root{
+      --ap-ok-bg:#fafafa;      --ap-ok-border:#e6e6e6;      --ap-ok-color:#1f1f1f;
+      --ap-warn-bg:#fff7db;    --ap-warn-border:#ffe7a6;    --ap-warn-color:#5a4300;
+      --ap-error-bg:#ffecec;   --ap-error-border:#ffc9c9;   --ap-error-color:#5a0000;
+
+      --ap-btn-bg:#f7f9fc;     --ap-btn-border:#dfe3ea;     --ap-btn-color:#2b2f36;
+      --ap-btn-hover-bg:#eef3fb;--ap-btn-hover-border:#cfd6e4;
+      --ap-btn-active-bg:#e6edf9;
+    }
+
+    .profile-control-card {
+      display:flex; align-items:center; justify-content:space-between; gap:16px;
+      padding:14px 12px;
+      border:1px solid var(--ap-ok-border); border-radius:10px;
+      background:var(--ap-ok-bg); color:var(--ap-ok-color);
+      transition: background-color .2s ease, border-color .2s ease, color .2s ease, box-shadow .2s ease;
+    }
+    .profile-control-card.ap--ok     { background:var(--ap-ok-bg);   border-color:var(--ap-ok-border);   color:var(--ap-ok-color); }
+    .profile-control-card.ap--paused { background:var(--ap-warn-bg); border-color:var(--ap-warn-border); color:var(--ap-warn-color); }
+    .profile-control-card.ap--none   { background:var(--ap-error-bg);border-color:var(--ap-error-border);color:var(--ap-error-color); }
+
+    .profile-control-left { display:flex; flex-direction:column; gap:2px; min-width:0; }
+    .profile-control-title { font-weight:700; font-size:16px; line-height:1.2; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .profile-control-meta { font-size:12px; color:inherit; opacity:.9; display:flex; gap:12px; flex-wrap:wrap; }
+
+    .profile-control-right {
+      display:flex; align-items:center; gap:8px;
+      background:transparent; border: 0 solid var(--ap-ok-border);
+      padding:6px; border-radius:8px;
+    }
+
+    .icon-btn{
+      display:inline-flex; align-items:center; justify-content:center;
+      width:34px; height:34px; border-radius:8px;
+      border:1px solid var(--ap-btn-border);
+      background:var(--ap-btn-bg);
+      color:var(--ap-btn-color);
+      cursor:pointer;
+      transition:transform .05s ease, background-color .15s ease, border-color .15s ease, opacity .15s ease;
+    }
+    .icon-btn i{ color:inherit; }
+    .icon-btn:hover{ background:var(--ap-btn-hover-bg); border-color:var(--ap-btn-hover-border); }
+    .icon-btn:active{ background:var(--ap-btn-active-bg); transform:translateY(1px); }
+    .icon-btn[disabled]{ opacity:.6; cursor:not-allowed; }
+
+    .icon-btn--pause, .icon-btn--play, .icon-btn--edit{
+      background:var(--ap-btn-bg); border-color:var(--ap-btn-border); color:var(--ap-btn-color);
+    }
+
+    .choose-link { text-decoration:none; }
+    .profile-control-right .section-btn{
+      background:#0171e3;
+      color:#fff;
+      border:1px solid #0171e3;
+      border-radius:8px; padding:8px 12px; font-weight:600;
+    }
+    .profile-control-right .section-btn:hover{
+      background:#0171e3; border-color#0171e3;
+    }
+
+    .ap-label { font-weight:700; opacity:.9; margin-right:6px; }
+    hr.solid { border:0; border-top:1px solid #e9e9e9; width:100%; margin:10px 0 6px; }
+
+    /* ===== Reservoir progress bar ===== */
+    .res-progress {
+      width:100%;
+      height:5px;
+      background:#eaeaea;
+      border-radius:6px;
+      overflow:hidden;
+      margin:6px 0 10px;
+      display:block;
+    }
+    .res-progress__bar { height:100%; width:0%; transition:width .25s ease; background:#0171E3; }
+    .res-bar--ok    { background:#0171E3; }
+    .res-bar--warn  { background:#ffb743; }
+    .res-bar--error { background:#ffb3b3; }
+    #card-water-quantity .card-value { margin:18px 0 8px; }
+
+    /* --- Minimal responsiveness --- */
+    @media (max-width: 700px) {
+      .card-grid { grid-template-columns: 1fr; }
+      .profile-control-card { flex-wrap: wrap; }
+      .profile-control-right { width:100%; justify-content:flex-start; }
+    }
+    
+    /* ===== Banner action progress ===== */
+.banner-progress { margin-top:8px; }
+.banner-progress__track {
+  position:relative; width:100%; height:6px;
+  background:#e9eef7; border-radius:6px; overflow:hidden;
+}
+.banner-progress__bar {
+  height:100%; width:0%;
+  background:#0171E3;  /* matches your blue */
+  transition: width .18s linear;   /* quick, low-lag */
+}
+.banner-progress__labels {
+  display:flex; justify-content:space-between;
+  font-size:12px; margin-top:6px; opacity:.85;
+}
+
+/* ===== Live System Status styles ===== */
+.lss-table { width:100%; border-collapse:collapse; font-size:13px; }
+.lss-table th, .lss-table td { padding:8px 12px; }
+.lss-table thead tr { background:#eef6ef; }
+.lss-row:nth-child(even) { background:#fafafa; }
+.lss-name i { width:18px; text-align:center; margin-right:6px; opacity:.8; }
+
+.pill {
+  display:inline-block; min-width:56px; text-align:center;
+  padding:2px 8px; border-radius:999px; font-weight:700; font-size:12px;
+  border:1px solid transparent;
+}
+.pill-on  { background:#e7f8e7; color:#0b3d0b; border-color:#bde7bd; }
+.pill-off { background:#ffe6e6; color:#5a0000; border-color:#ffb3b3; }
+
+.lss-progress-cell { text-align:right; }
+.lss-track {
+  display:inline-block; vertical-align:middle;
+  width:100%; max-width:380px; height:8px; background:#e9eef7; border-radius:999px; overflow:hidden;
+}
+.lss-bar { height:100%; width:0%; background:#0171E3; transition: width .16s linear; }
+.lss-times { font-size:12px; opacity:.85; margin-top:4px; text-align:right; }
+.lss-state-cell, .lss-count-cell { text-align:center; }
+.lss-since { font-size:11px; opacity:.75; margin-top:4px;}
+
+/* Solid red (no flashing) when there’s no active profile */
+.card.no-profile { border-color:#ff4d4f; animation:none !important; }
+.badge.noprofile { background-color:#ffb3b3 !important; color:#5a0000 !important; animation:none !important; }
+
+
+
+  </style>
+</head>
+<body>
+
+  <!-- HEADER -->
+  {% include "header2.html" %}
+
+  <!-- MAIN CONTENT -->
+  <div class="container">
+    <!-- System Status banner -->
+    <div id="system-banner" class="system-message banner--warning">
+  <div class="banner-body">
+    <div class="banner-label">
+      <span id="status-icon" class="status-icon" aria-hidden="true"></span>
+      System Status
+    </div>
+    <div class="banner-value" id="system-message">Loading…</div>
+  </div>
+
+  <!-- NEW: action progress (hidden unless an action is running) -->
+  <div id="banner-progress" class="banner-progress" style="display:none;">
+    <div class="banner-progress__track"
+         role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"
+         aria-label="Current action progress">
+      <div id="banner-progress-bar" class="banner-progress__bar"></div>
+    </div>
+    <div class="banner-progress__labels">
+      <span id="bp-elapsed">0:00</span>
+      <span id="bp-remaining">0:00</span>
+    </div>
+  </div>
+</div>
+
+
+
+
+
+
+
+
+
+    <!-- Active Profile Control Card (Stop removed) -->
+    <div id="active-profile-card" class="profile-control-card ap--none" aria-live="polite">
+      <div class="profile-control-left">
+        <div class="profile-control-title">
+          <span class="ap-label">Active profile:</span>
+          <span id="ap-name">No active profile</span>
+        </div>
+        <div class="profile-control-meta">
+          <span>Started: <span id="ap-date">—</span></span>
+          <span>Time since start: <span id="ap-uptime">—</span></span>
+        </div>
+      </div>
+      <div class="profile-control-right">
+        <!-- Continue (unpause) -->
+        <form id="ap-form-unpause" action="/unpause" method="POST" style="display:none;">
+          <button type="submit" class="icon-btn icon-btn--play" title="Continue">
+            <i class="fa-solid fa-play" aria-hidden="true"></i>
+          </button>
+        </form>
+        <!-- Pause -->
+        <form id="ap-form-pause" action="/pause" method="POST" style="display:none;">
+          <button type="submit" class="icon-btn icon-btn--pause" title="Pause">
+            <i class="fa-solid fa-pause" aria-hidden="true"></i>
+          </button>
+        </form>
+        <!-- Edit (visible when running or paused) -->
+        <a id="ap-edit-link" href="javascript:void(0)" class="icon-btn icon-btn--edit" title="Profile settings" style="display:none;">
+          <i class="fa-solid fa-sliders" aria-hidden="true"></i>
+        </a>
+        <!-- Choose Profile (only when none is active) -->
+        <a id="ap-choose-link" href="/profiles" class="choose-link" style="display:none;">
+          <span class="section-btn">Choose a profile</span>
+        </a>
+      </div>
+    </div>
+
+    <hr class="solid">
+
+    <!-- Sensor Cards -->
+    <div class="card-grid">
+      <div id="card-temp" class="card null">
+        <div class="card-header">Air Temperature <span id="badge-temp" class="badge null">null</span></div>
+        <div class="card-value"><span id="temp-value">null</span><span class="unit">°C</span></div>
+        <div class="sub-readings">
+          <div>Top: <span id="temp-top">--</span><span class="unit">°C</span></div>
+          <div>Bottom: <span id="temp-bottom">--</span><span class="unit">°C</span></div>
+        </div>
+        <div class="card-meta">
+          <div>Min: <span id="temp-min">--</span><span class="unit">°C</span></div>
+          <div>Target: <span id="temp-target">--</span><span class="unit">°C</span></div>
+          <div>Max: <span id="temp-max">--</span><span class="unit">°C</span></div>
+        </div>
+      </div>
+
+      <div id="card-humidity" class="card null">
+        <div class="card-header">Air Humidity <span id="badge-humidity" class="badge null">null</span></div>
+        <div class="card-value"><span id="humidity-value">null</span><span class="unit">%</span></div>
+        <div class="sub-readings">
+          <div>Top: <span id="humidity-top">--</span><span class="unit">%</span></div>
+          <div>Bottom: <span id="humidity-bottom">--</span><span class="unit">%</span></div>
+        </div>
+        <div class="card-meta">
+          <div>Min: <span id="humidity-min">--</span><span class="unit">%</span></div>
+          <div>Target: <span id="humidity-target">--</span><span class="unit">%</span></div>
+          <div>Max: <span id="humidity-max">--</span><span class="unit">%</span></div>
+        </div>
+      </div>
+
+      <div id="card-water-temp" class="card null">
+        <div class="card-header">Water Temperature <span id="badge-water-temp" class="badge null">null</span></div>
+        <div class="card-value"><span id="water-temp-value">null</span><span class="unit">°C</span></div>
+        <div class="card-meta">
+          <div>Min: <span id="water-temp-min">--</span><span class="unit">°C</span></div>
+          <div>Target: <span id="water-temp-target">--</span><span class="unit">°C</span></div>
+          <div>Max: <span id="water-temp-max">--</span><span class="unit">°C</span></div>
+        </div>
+      </div>
+
+      <!-- Water Quantity -->
+      <div id="card-water-quantity" class="card null">
+        <div class="card-header">Reservoir Quantity <span id="badge-water-quantity" class="badge null">null</span></div>
+        <div class="card-value">
+          <span id="water-kg">null</span><span class="unit">kg</span>
+        </div>
+
+        <!-- Progress bar -->
+        <div class="res-progress" aria-hidden="true">
+          <div id="water-bar" class="res-progress__bar res-bar--ok" style="width:0%"></div>
+        </div>
+
+        <!-- Inline meta like the temp cards -->
+        <div class="card-meta">
+          <div>Remaining: <span id="water-pct">—</span><span class="unit">%</span></div>
+          <div>Capacity: <span id="water-capacity">—</span><span class="unit">kg</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Live System Status (rebuilt) -->
+<div class="section-box" id="lss-box">
+  <div class="section-header section-header--status">
+    Live System Status
+    <button class="section-btn" id="lss-manual">Manual Override</button>
+  </div>
+
+  <table class="lss-table">
+    <thead>
+      <tr>
+        <th style="text-align:left;">Appliance</th>
+        <th style="text-align:center;">Status</th>
+        <th style="text-align:center;">Cycles</th>
+        <th style="text-align:right; width:52%;">Progress</th>
+      </tr>
+    </thead>
+    <tbody id="lss-body">
+      <!-- Water pump -->
+      <tr id="lss-row-pump" class="lss-row">
+        <td class="lss-name"><i class="fa-solid fa-faucet-drip"></i> Water pump</td>
+        <td class="lss-state-cell"><span id="lss-state-pill-pump" class="pill pill-off">OFF</span></td>
+        <td class="lss-count-cell"><span id="lss-count-pump">0</span></td>
+        <td class="lss-progress-cell">
+          <div id="lss-track-pump" class="lss-track" style="display:none;">
+            <div id="lss-bar-pump" class="lss-bar"></div>
+          </div>
+          <div id="lss-times-pump" class="lss-times" style="display:none;">
+            <span id="lss-elapsed-pump">0:00</span> / <span id="lss-remaining-pump">0:00</span>
+          </div>
+        </td>
+      </tr>
+
+      <!-- Agitator -->
+      <tr id="lss-row-agitator" class="lss-row">
+        <td class="lss-name"><i class="fa-solid fa-water"></i> Agitator</td>
+        <td class="lss-state-cell"><span id="lss-state-pill-agitator" class="pill pill-off">OFF</span></td>
+        <td class="lss-count-cell"><span id="lss-count-agitator">0</span></td>
+        <td class="lss-progress-cell">
+          <div id="lss-track-agitator" class="lss-track" style="display:none;">
+            <div id="lss-bar-agitator" class="lss-bar"></div>
+          </div>
+          <div id="lss-times-agitator" class="lss-times" style="display:none;">
+            <span id="lss-elapsed-agitator">0:00</span> / <span id="lss-remaining-agitator">0:00</span>
+          </div>
+        </td>
+      </tr>
+
+      <!-- Air pump -->
+      <tr id="lss-row-air" class="lss-row">
+        <td class="lss-name"><i class="fa-solid fa-wind"></i> Air pump</td>
+        <td class="lss-state-cell"><span id="lss-state-pill-air" class="pill pill-off">OFF</span></td>
+        <td class="lss-count-cell"><span id="lss-count-air">0</span></td>
+        <td class="lss-progress-cell">
+          <div id="lss-track-air" class="lss-track" style="display:none;">
+            <div id="lss-bar-air" class="lss-bar"></div>
+          </div>
+          <div id="lss-times-air" class="lss-times" style="display:none;">
+            <span id="lss-elapsed-air">0:00</span> / <span id="lss-remaining-air">0:00</span>
+          </div>
+        </td>
+      </tr>
+            <!-- Humidifier -->
+      <tr id="lss-row-humidifier" class="lss-row">
+        <td class="lss-name"><i class="fa-solid fa-droplet"></i> Humidifier</td>
+        <td class="lss-state-cell">
+          <span id="lss-state-pill-humidifier" class="pill pill-off">OFF</span>
+
+        </td>
+        <td class="lss-count-cell"><span id="lss-count-humidifier">0</span></td>
+        <td class="lss-progress-cell">—</td>
+      </tr>
+
+      <!-- Heater -->
+      <tr id="lss-row-heater" class="lss-row">
+        <td class="lss-name"><i class="fa-solid fa-fire"></i> Heater</td>
+        <td class="lss-state-cell">
+          <span id="lss-state-pill-heater" class="pill pill-off">OFF</span>
+
+        </td>
+        <td class="lss-count-cell"><span id="lss-count-heater">0</span></td>
+        <td class="lss-progress-cell">—</td>
+      </tr>
+
+      <!-- Extractor -->
+      <tr id="lss-row-extractor" class="lss-row">
+        <td class="lss-name"><i class="fa-solid fa-fan"></i> Extractor</td>
+        <td class="lss-state-cell">
+          <span id="lss-state-pill-extractor" class="pill pill-off">OFF</span>
+        
+        </td>
+        <td class="lss-count-cell"><span id="lss-count-extractor">0</span></td>
+        <td class="lss-progress-cell">—</td>
+      </tr>
+
+
+
+
+    </tbody>
+  </table>
+</div>
+
+
+
+
+
+<script>
+/* ===== GrowStuff Dashboard JS — Timed devices + reactive devices (persistent cycles; no banner progress; no +1 on refresh) ===== */
+(() => {
+  const POLL_MS = 500;
+
+// In-flight guard + self-scheduling timer (prevents overlapping fetches)
+  let inFlight = false;
+  let pollTimer = null;
+
+
+  // --- one-off CSS helper for softwarn badges ---
+  (function ensureSoftWarnCSS(){
+    if (document.getElementById('gs-softwarn-style')) return;
+    const css = '.badge.softwarn{background-color:#ffe08a !important;color:#121212 !important;animation:none !important;}';
+    const style = document.createElement('style');
+    style.id = 'gs-softwarn-style';
+    style.textContent = css;
+    document.head.appendChild(style);
+  })();
+
+  // --- DOM refs for banner/profile/sensors ---
+  const els = {
+    systemMsg:        document.getElementById('system-message'),
+    systemBannerBox:  document.getElementById('system-banner'),
+    statusIcon:       document.getElementById('status-icon'),
+
+    apCard:        document.getElementById('active-profile-card'),
+    apName:        document.getElementById('ap-name'),
+    apDate:        document.getElementById('ap-date'),
+    apUptime:      document.getElementById('ap-uptime'),
+    apFormPause:   document.getElementById('ap-form-pause'),
+    apFormUnpause: document.getElementById('ap-form-unpause'),
+    apEdit:        document.getElementById('ap-edit-link'),
+    apChoose:      document.getElementById('ap-choose-link'),
+  };
+
+  const isFiniteNum = v => Number.isFinite(Number(v));
+  const num1 = v => Number(v).toFixed(1);
+  const pct0 = v => Math.round(v);
+  const setTxt = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+
+  function formatDate(iso){ try { return new Date(iso + 'Z').toLocaleDateString(); } catch { return '—'; } }
+  function computeUptime(iso){
+    try {
+      const start = new Date(iso + 'Z');
+      const now   = new Date();
+      const diffS = Math.max(0, Math.floor((now - start) / 1000));
+      const d = Math.floor(diffS / 86400);
+      const h = Math.floor((diffS % 86400) / 3600);
+      const m = Math.floor((diffS % 3600) / 60);
+      return `${d}d ${h}h ${m}m`;
+    } catch { return '—'; }
+  }
+  function fmtMMSS(totalSeconds){
+    const s = Math.max(0, Math.floor(Number(totalSeconds) || 0));
+    const m = Math.floor(s / 60);
+    const r = s % 60;
+    return `${m}:${String(r).padStart(2, '0')}`;
+  }
+  function hhmmssFromMs(ms){
+    const s = Math.max(0, Math.floor(ms/1000));
+    const h = Math.floor(s/3600);
+    const m = Math.floor((s%3600)/60);
+    const r = s%60;
+    return (h>0? h+':' : '') + (h>0? String(m).padStart(2,'0'): m) + ':' + String(r).padStart(2,'0');
+  }
+
+  // --- Cards/sensors ---
+  function nullifyCard(card, badge, valueSetter){
+    card.classList.add('null'); badge.classList.add('null');
+    badge.textContent = 'null'; valueSetter();
+    card.classList.remove('out-of-range'); badge.classList.remove('warn','ok','softwarn');
+  }
+  function updateCard(key, val, min, target, max){
+    const card  = document.getElementById(`card-${key}`);
+    const badge = document.getElementById(`badge-${key}`);
+    const valEl = document.getElementById(`${key}-value`);
+    if (!card || !badge || !valEl) return;
+    card.classList.remove('null'); badge.classList.remove('null');
+
+    const n = Number(val);
+    if (!Number.isFinite(n)) {
+      return nullifyCard(card, badge, () => { valEl.textContent = 'null'; });
+    }
+    valEl.textContent = num1(n);
+    setTxt(`${key}-min`,    isFiniteNum(min)    ? min    : '—');
+    if (document.getElementById(`${key}-target`)) setTxt(`${key}-target`, isFiniteNum(target) ? target : '—');
+    if (document.getElementById(`${key}-max`))    setTxt(`${key}-max`,    isFiniteNum(max)    ? max    : '—');
+
+    const hasMin = isFiniteNum(min), hasMax = isFiniteNum(max);
+    const outLow  = hasMin && n < Number(min);
+    const outHigh = hasMax && n > Number(max);
+    if (outLow || outHigh) {
+      card.classList.add('out-of-range'); badge.classList.remove('ok','softwarn'); badge.classList.add('warn');
+      badge.textContent = 'Out of range';
+    } else {
+      card.classList.remove('out-of-range'); badge.classList.remove('warn','softwarn'); badge.classList.add('ok');
+      badge.textContent = 'In Range';
+    }
+  }
+  function setSubReadings(key, top, bottom) {
+    const topEl = document.getElementById(`${key}-top`);
+    const botEl = document.getElementById(`${key}-bottom`);
+    if (topEl) topEl.textContent = isFiniteNum(top) ? num1(top) : '—';
+    if (botEl) botEl.textContent = isFiniteNum(bottom) ? num1(bottom) : '—';
+  }
+  function forceCardNull(key){
+    const card  = document.getElementById(`card-${key}`);
+    const badge = document.getElementById(`badge-${key}`);
+    if (!card || !badge) return;
+    nullifyCard(card, badge, () => {
+      const v = document.getElementById(`${key}-value`);
+      if (v) v.textContent = 'null';
+      [`${key}-min`, `${key}-target`, `${key}-max`, `${key}-top`, `${key}-bottom`].forEach(id => {
+        const el = document.getElementById(id); if (el) el.textContent = '—';
+      });
+    });
+  }
+  function setNoProfileCard(key, currentValue){
+  const card  = document.getElementById(`card-${key}`);
+  const badge = document.getElementById(`badge-${key}`);
+  if (!card || !badge) return;
+
+  // Keep the live reading visible (don’t blank it)
+  const vEl = document.getElementById(`${key}-value`);
+  if (vEl && Number.isFinite(Number(currentValue))) {
+    vEl.textContent = Number(currentValue).toFixed(1);
+  }
+
+  // Solid red (no flashing) + pill text “No profile”
+  card.classList.remove('null','out-of-range');
+  card.classList.add('no-profile');
+  badge.classList.remove('null','ok','warn','softwarn');
+  badge.classList.add('noprofile');
+  badge.textContent = 'No active profile';
+
+  // Threshold labels show “No profile”
+  const ids = [`${key}-min`, `${key}-target`, `${key}-max`];
+  ids.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = 'No profile';
+  });
+}
+
+
+
+
+  // --- typing/rotator + banner (message only) ---
+  let typingToken = 0;
+  function typeTo(el, text, speed = 22) {
+    const token = ++typingToken;
+    el.textContent = '';
+    let i = 0;
+    (function tick() {
+      if (token !== typingToken) return;
+      if (i <= text.length) { el.textContent = text.slice(0, i++); setTimeout(tick, speed); }
+    })();
+  }
+  function cancelTyping(){ typingToken++; }
+  const DEFAULT_ROTATE = [
+    "Checking environment…",
+    "Light schedule: standing by.",
+    "Pump cycles: on watch.",
+    "Logging sensor data…",
+    "All systems green."
+  ];
+  const ICONS = {
+    ok:      '<i class="fa-solid fa-circle-check" aria-hidden="true"></i>',
+    info:    '<i class="fa-solid fa-arrows-rotate fa-spin" aria-hidden="true"></i>',
+    warning: '<i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i>',
+    error:   '<i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i>',
+  };
+  let rotateTimer = null, rotateIdx = 0, lastBannerLevel = null, lastRotateKey = null;
+  const rotateKey = arr => { try { return JSON.stringify(arr || []); } catch { return String(arr?.length || 0); } };
+
+  function applyBanner(banner) {
+    const el = els.systemMsg; if (!el) return;
+    const box = els.systemBannerBox;
+    const lvl = (banner?.level || 'ok').toLowerCase();
+    const rotate  = Array.isArray(banner?.rotate) ? banner.rotate : [];
+    const message = banner?.message || '—';
+    const thisKey = rotateKey(rotate);
+
+    if (box) {
+      box.classList.remove('banner--ok','banner--info','banner--warning','banner--error');
+      if (['ok','info','warning','error'].includes(lvl)) box.classList.add(`banner--${lvl}`);
+    }
+    if (els.statusIcon) els.statusIcon.innerHTML = ICONS[lvl] || ICONS.ok;
+
+    if (lvl !== 'ok') {
+      if (rotateTimer) { clearInterval(rotateTimer); rotateTimer = null; }
+      cancelTyping(); el.textContent = message;
+      lastBannerLevel = lvl; lastRotateKey = null; return;
+    }
+
+    const changed = (lvl !== lastBannerLevel) || (thisKey !== lastRotateKey);
+    if (rotate.length > 0) {
+      if (changed) {
+        if (rotateTimer) { clearInterval(rotateTimer); rotateTimer = null; }
+        rotateIdx = 0; typeTo(el, rotate[rotateIdx]);
+        rotateTimer = setInterval(() => {
+          rotateIdx = (rotateIdx + 1) % rotate.length;
+          typeTo(el, rotate[rotateIdx]);
+        }, 6000);
+        lastBannerLevel = lvl; lastRotateKey = thisKey;
+      }
+      return;
+    }
+    if (changed) {
+      if (rotateTimer) { clearInterval(rotateTimer); rotateTimer = null; }
+      typeTo(el, message);
+      lastBannerLevel = lvl; lastRotateKey = thisKey;
+    }
+  }
+
+  // --- Profile + sensors ---
+  function updateProfileUI(d){
+    const hasProfile = !!d?.profile;
+    const started    = !!d?.start_time;
+    theRunning = hasProfile && started;
+    const paused     = !!d?.paused;
+
+    const bubbleProfileBox = document.getElementById('bubble-profile');
+    const bubbleProfileVal = document.getElementById('bubble-profile-value');
+    const bubbleTimeBox    = document.getElementById('bubble-time');
+    const bubbleDate       = document.getElementById('bubble-date');
+    const bubbleUptime     = document.getElementById('bubble-uptime');
+
+    if (bubbleProfileBox) {
+      bubbleProfileBox.classList.remove('bubble--ok','bubble--warning','bubble--error','bubble--neutral');
+      bubbleProfileBox.classList.add(hasProfile ? 'bubble--ok' : 'bubble--error');
+    }
+    if (bubbleProfileVal) bubbleProfileVal.textContent = hasProfile ? d.profile : 'None';
+
+    if (bubbleTimeBox) {
+      bubbleTimeBox.classList.remove('bubble--ok','bubble--warning','bubble--error','bubble--neutral');
+      bubbleTimeBox.classList.add(paused ? 'bubble--warning' : (started ? 'bubble--ok' : 'bubble--neutral'));
+    }
+    if (bubbleDate)   bubbleDate.textContent   = started ? formatDate(d.start_time) : '—';
+    if (bubbleUptime) bubbleUptime.textContent = started ? computeUptime(d.start_time) : '—';
+
+    if (els.apCard) {
+      els.apName.textContent   = hasProfile ? d.profile : 'No active profile';
+      els.apDate.textContent   = started ? formatDate(d.start_time) : '—';
+      els.apUptime.textContent = started ? computeUptime(d.start_time) : '—';
+
+      els.apCard.classList.remove('ap--ok','ap--paused','ap--none');
+      if (!hasProfile) els.apCard.classList.add('ap--none');
+      else if (paused) els.apCard.classList.add('ap--paused');
+      else els.apCard.classList.add('ap--ok');
+
+      if (els.apFormPause)    els.apFormPause.style.display    = (theRunning && !paused) ? 'block' : 'none';
+      if (els.apFormUnpause)  els.apFormUnpause.style.display  = (theRunning &&  paused) ? 'block' : 'none';
+
+      if (els.apEdit) {
+        if (hasProfile) {
+          els.apEdit.style.display = 'inline-flex';
+          els.apEdit.setAttribute('href', `/edit/${encodeURIComponent(d.profile)}`);
+        } else {
+          els.apEdit.style.display = 'none';
+          els.apEdit.setAttribute('href', 'javascript:void(0)');
+        }
+      }
+      if (els.apChoose) els.apChoose.style.display = theRunning ? 'none' : 'block';
+    }
+  }
+  function updateStatus(d){
+    const statusPump  = document.getElementById('status-pump');
+    const statusFan   = document.getElementById('status-fan');
+    const statusCycle = document.getElementById('status-cycle');
+    if (statusPump)  statusPump.textContent  = d.pump_state ?? 'OFF';
+    if (statusFan)   statusFan.textContent   = d.fan_state  ?? 'OFF';
+    if (statusCycle) statusCycle.textContent = isFiniteNum(d.cycle_count) ? d.cycle_count : 0;
+  }
+  function normalizeWaterStatus(raw){
+    const s = (raw||'').toString().trim().toLowerCase();
+    if (!s) return '';
+    if (s.includes('cutoff') || s.includes('cut off') || s.includes('cuttof')) return 'cutoff';
+    if (s === 'critical') return 'critical';
+    if (s === 'low' || s.includes('below')) return 'low';
+    if (s === 'half') return 'half';
+    if (s === 'full') return 'full';
+    if (s === 'ok' || s === 'okay' || s === 'normal') return 'ok';
+    return '';
+  }
+  function updateWaterCard(d){
+    const card  = document.getElementById('card-water-quantity');
+    const badge = document.getElementById('badge-water-quantity');
+    const barEl = document.getElementById('water-bar');
+    if (!card || !badge || !barEl) return;
+
+    card.classList.remove('null'); badge.classList.remove('null');
+
+    const water   = (d?.reservoir_water_kg ?? d?.water_quantity);
+    const usable  = d?.reservoir_debug?.usable;
+    const minKg   = d?.water_quantity_min;
+    const rawStat = d?.reservoir_status;
+
+    if (!isFiniteNum(water) || !isFiniteNum(usable) || usable <= 0) {
+      return nullifyCard(card, badge, () => {
+        setTxt('water-kg', 'null'); setTxt('water-pct', '—'); setTxt('water-capacity', '—');
+        barEl.style.width = '0%'; barEl.className = 'res-progress__bar res-bar--ok';
+      });
+    }
+    const w   = Number(water);
+    const cap = Number(usable);
+    const pct = Math.max(0, Math.min(100, (w / cap) * 100));
+    setTxt('water-kg', `${num1(w)}`); setTxt('water-pct', `${pct0(pct)}`); setTxt('water-capacity', `${num1(cap)}`);
+
+    const halfPct = 50;
+    const lowPct  = isFiniteNum(minKg) ? Math.max(0, Math.min(100, (Number(minKg) / cap) * 100)) : 25;
+    const belowMin = isFiniteNum(minKg) && w < Number(minKg);
+
+    const norm = normalizeWaterStatus(rawStat);
+    let severity = 'green', label = 'OK';
+    if (norm === 'cutoff' || norm === 'critical' || norm === 'low' || belowMin) {
+      severity = 'red'; label = (norm === 'cutoff') ? 'Cutoff' : (norm === 'critical') ? 'Critical' : 'Low';
+    } else if (pct < halfPct) { severity = 'yellow'; label = 'Less than half';
+    } else if (norm === 'full' || pct >= 99) { severity = 'green'; label = 'Full';
+    } else if (norm === 'ok' || norm === 'half' || norm === '') { severity = 'green'; label = 'OK'; }
+
+    badge.classList.remove('ok','warn','softwarn');
+    if (severity === 'red') { card.classList.add('out-of-range'); badge.classList.add('warn'); }
+    else { card.classList.remove('out-of-range'); badge.classList.add(severity === 'yellow' ? 'softwarn' : 'ok'); }
+    badge.textContent = label;
+
+    let barClass = 'res-bar--OK';
+    if (severity === 'yellow') barClass = 'res-bar--warn';
+    else if (severity === 'red') barClass = 'res-bar--error';
+    barEl.style.width = `${pct}%`; barEl.className = `res-progress__bar ${barClass}`;
+  }
+function updateSensors(d){
+  const thresholdsActive = !!d?.profile;
+
+  if (!thresholdsActive) {
+    // Show current readings, but style the three cards as "no profile"
+    setNoProfileCard('temp',        d.temperature_c);
+    setNoProfileCard('humidity',    d.humidity);
+    if ('water_temperature' in d) {
+      setNoProfileCard('water-temp', d.water_temperature);
+    }
+    // Reservoir behaves as normal
+    updateWaterCard(d);
+    return;
+  }
+
+  // Normal behaviour when a profile IS active (unchanged)
+  updateCard('temp', d.temperature_c, d.temperature_min, d.temperature_target, d.temperature_max);
+  setSubReadings('temp', d.temperature_top, d.temperature_bottom);
+
+  updateCard('humidity', d.humidity, d.humidity_min, d.humidity_target, d.humidity_max);
+  setSubReadings('humidity', d.humidity_top, d.humidity_bottom);
+
+  if ('water_temperature' in d) {
+    updateCard('water-temp', d.water_temperature, d.water_temperature_min, d.water_temperature_target, d.water_temperature_max);
+  }
+
+  updateWaterCard(d);
+}
+
+
+
+
+
+
+
+  // --- Live System Status (timed devices) ---
+  const DEVICES = [
+    {key:'pump',     label:'Water pump',
+      state:'pump_state', rem:'pump_time_remaining_s', total:'pump_time_total_s', count:'cycle_count'},
+    {key:'agitator', label:'Agitator',
+      state:'agitator_state', rem:'agitator_time_remaining_s', total:'agitator_time_total_s', count:'agitator_cycle_count'},
+    {key:'air',      label:'Air pump',
+      state:'air_pump_state', rem:'air_pump_time_remaining_s', total:'air_pump_time_total_s', count:'air_pump_cycle_count'},
+  ];
+
+  // --- Live System Status (reactive devices — pill + since + cycles; no progress) ---
+  const THRESH_DEVICES = [
+    { key:'humidifier', state:'humidifier_state', count:'humidifier_cycle_count' },
+    { key:'heater',     state:'heater_state',     count:'heater_cycle_count'     },
+    { key:'extractor',  state:'extractor_state',  count:'extractor_cycle_count'  },
+  ];
+
+  const E = {};  // element refs
+  const S = {};  // per-device state
+  let rafLSS = 0, profileKey = null;
+
+  function $(id){ return document.getElementById(id); }
+  function fmt(s){ s = Math.max(0, Math.floor(Number(s) || 0)); const m = Math.floor(s/60), r=s%60; return `${m}:${String(r).padStart(2,'0')}`; }
+
+  function initDom(){
+    // Timed devices
+    DEVICES.forEach(d => {
+      E[d.key] = {
+        pill:     $(`lss-state-pill-${d.key}`),
+        count:    $(`lss-count-${d.key}`),
+        track:    $(`lss-track-${d.key}`),
+        bar:      $(`lss-bar-${d.key}`),
+        timesBox: $(`lss-times-${d.key}`),
+        elapsed:  $(`lss-elapsed-${d.key}`),
+        remain:   $(`lss-remaining-${d.key}`)
+      };
+      S[d.key] = { on:false, total:0, seedElapsed:0, startedPerf:0, localCount:0, lastServerOn:false };
+    });
+
+    // Reactive devices (pill + since + cycles) — includes hasInit guard
+    THRESH_DEVICES.forEach(d => {
+      E[d.key] = {
+        pill:  $(`lss-state-pill-${d.key}`),
+        since: $(`lss-since-${d.key}`),
+        count: $(`lss-count-${d.key}`)
+      };
+      S[d.key] = { lastServerOn:false, sinceTs:0, localCount:0, hasInit:false };
+    });
+  }
+
+  // Persist local cycle counts per active profile (both timed + reactive)
+  function makeProfileKey(d){ if (!d || !d.profile || !d.start_time) return null; return `${d.profile} | ${d.start_time}`; }
+  function loadCounts(pk){
+    try { const raw = sessionStorage.getItem(`lss-counts:${pk}`); return raw ? JSON.parse(raw) : {}; }
+    catch { return {}; }
+  }
+  function saveCounts(pk, counts){
+    try { sessionStorage.setItem(`lss-counts:${pk}`, JSON.stringify(counts||{})); } catch {}
+  }
+
+  function setPill(key, isOn){
+    const el = E[key]?.pill; if (!el) return;
+    el.textContent = isOn ? 'ON' : 'OFF';
+    el.classList.remove(isOn ? 'pill-off' : 'pill-on');
+    el.classList.add(isOn ? 'pill-on' : 'pill-off');
+  }
+
+  function startAnim(){
+    if (rafLSS) return;
+    const tick = () => {
+      let any = false;
+      const now = performance.now();
+
+      // Timed devices animation
+      DEVICES.forEach(d => {
+        const st = S[d.key]; const el = E[d.key]; if (!st.on || !el) return; any = true;
+
+        const elapsed = st.seedElapsed + (now - st.startedPerf)/1000;
+        const clamped = Math.min(st.total, Math.max(0, elapsed));
+        const remain  = Math.max(0, st.total - clamped);
+        const pct = st.total > 0 ? Math.round((clamped / st.total) * 100) : 100;
+
+        el.bar && (el.bar.style.width = `${pct}%`);
+        el.elapsed && (el.elapsed.textContent = fmt(Math.round(clamped)));
+        el.remain  && (el.remain.textContent  = fmt(Math.ceil(remain)));
+
+        if (remain <= 0) st.on = false;
+      });
+
+      // Keep "since" timers fresh for reactive devices
+      const nowSince = performance.now();
+      THRESH_DEVICES.forEach(dv => {
+        const el = E[dv.key];
+        const st = S[dv.key];
+        if (!el || !st || !el.since || !st.sinceTs) return;
+        el.since.textContent = (st.lastServerOn ? 'ON ' : 'OFF ') + 'for ' + hhmmssFromMs(nowSince - st.sinceTs);
+      });
+
+      rafLSS = any ? requestAnimationFrame(tick) : 0;
+    };
+    rafLSS = requestAnimationFrame(tick);
+  }
+
+  function stopAnimIfIdle(){
+    if (rafLSS) {
+      const any = DEVICES.some(d => S[d.key].on);
+      if (!any) { cancelAnimationFrame(rafLSS); rafLSS = 0; }
+    }
+  }
+
+  function handleProfileChange(d){
+    const pk = makeProfileKey(d);
+    if (pk && pk !== profileKey) {
+      profileKey = pk;
+
+      // Load counts for both timed and reactive devices
+      const fromStore = loadCounts(pk);
+      DEVICES.forEach(dev => {
+        S[dev.key].localCount = Number(fromStore[dev.key]) || 0;
+        if (E[dev.key].count) E[dev.key].count.textContent = S[dev.key].localCount;
+      });
+      THRESH_DEVICES.forEach(dev => {
+        S[dev.key].localCount = Number(fromStore[dev.key]) || 0;
+        if (E[dev.key].count) E[dev.key].count.textContent = S[dev.key].localCount;
+        // reset init so first poll seeds state without increment
+        S[dev.key].hasInit = false;
+        S[dev.key].sinceTs = 0;
+      });
+
+      // Stop any stale timed animations; they'll be re-seeded if ON
+      DEVICES.forEach(dev => { S[dev.key].on = false; });
+      stopAnimIfIdle();
+    }
+  }
+
+  function updateCountsInStorage(){
+    if (!profileKey) return;
+    const out = {};
+    DEVICES.forEach(dev => out[dev.key] = S[dev.key].localCount || 0);
+    THRESH_DEVICES.forEach(dev => out[dev.key] = S[dev.key].localCount || 0);
+    saveCounts(profileKey, out);
+  }
+
+  function syncFromStatus(d){
+    handleProfileChange(d);
+
+    // Timed devices
+    DEVICES.forEach(dev => {
+      const el = E[dev.key]; if (!el) return;
+
+      const stateRaw = String(d?.[dev.state] || 'OFF').toUpperCase();
+      const serverOn = (stateRaw === 'ON');
+      const totalS   = Number(d?.[dev.total]);
+      const remS     = Number(d?.[dev.rem]);
+
+      // Pill
+      setPill(dev.key, serverOn);
+
+      // Cycles: server preferred; else local OFF->ON edge (persisted)
+      const serverCount = d?.[dev.count];
+      if (Number.isFinite(serverCount)) {
+        S[dev.key].localCount = Number(serverCount);
+      } else {
+        const wasOn = S[dev.key].lastServerOn === true;
+        if (serverOn && !wasOn) { S[dev.key].localCount += 1; updateCountsInStorage(); }
+      }
+      S[dev.key].lastServerOn = serverOn;
+      if (el.count) el.count.textContent = S[dev.key].localCount;
+
+      // Progress
+      if (serverOn && Number.isFinite(totalS) && totalS > 0) {
+        if (!S[dev.key].on || S[dev.key].total !== totalS) {
+          S[dev.key].on = true;
+          S[dev.key].total = totalS;
+          if (Number.isFinite(remS) && remS >= 0 && remS <= totalS) {
+            S[dev.key].seedElapsed = Math.max(0, totalS - remS);
+          } else {
+            S[dev.key].seedElapsed = 0;
+          }
+          S[dev.key].startedPerf = performance.now();
+          el.track && (el.track.style.display  = '');
+          el.timesBox && (el.timesBox.style.display = '');
+          startAnim();
+        }
+      } else {
+        S[dev.key].on = false;
+        if (el.track)   el.track.style.display = 'none';
+        if (el.timesBox)el.timesBox.style.display = 'none';
+        if (el.bar)     el.bar.style.width = '0%';
+      }
+    });
+
+    stopAnimIfIdle();
+
+    // Reactive devices: pill + "since" + cycles (persisted; NO +1 on first poll)
+    const nowMs = performance.now();
+    THRESH_DEVICES.forEach(dev => {
+      const el = E[dev.key]; if (!el) return;
+
+      const stateRaw = String(d?.[dev.state] || 'OFF').toUpperCase();
+      const serverOn = (stateRaw === 'ON');
+
+      // pill
+      if (el.pill) {
+        el.pill.textContent = serverOn ? 'ON' : 'OFF';
+        el.pill.classList.remove(serverOn ? 'pill-off' : 'pill-on');
+        el.pill.classList.add(serverOn ? 'pill-on' : 'pill-off');
+      }
+
+      // cycles:
+      const serverCount = d?.[dev.count];
+      if (Number.isFinite(serverCount)) {
+        // authoritative from backend
+        S[dev.key].localCount = Number(serverCount);
+      } else {
+        if (!S[dev.key].hasInit) {
+          // First poll after load/profile-change: seed state, don't count
+          S[dev.key].hasInit = true;
+          S[dev.key].lastServerOn = serverOn;
+          S[dev.key].sinceTs = nowMs; // start "since" from when we first observed
+        } else {
+          // Normal edge detection after init
+          const wasOn = S[dev.key].lastServerOn === true;
+          if (serverOn && !wasOn) {
+            S[dev.key].localCount += 1;
+            updateCountsInStorage();
+            S[dev.key].sinceTs = nowMs; // reset since on edge
+          } else if (!serverOn && wasOn) {
+            S[dev.key].sinceTs = nowMs; // reset since on edge
+          }
+          S[dev.key].lastServerOn = serverOn;
+        }
+      }
+
+      if (el.count) el.count.textContent = S[dev.key].localCount;
+
+      // since: render
+      if (S[dev.key].sinceTs === 0) S[dev.key].sinceTs = nowMs;
+      if (el.since) {
+        el.since.textContent = (serverOn ? 'ON ' : 'OFF ') + 'for ' + hhmmssFromMs(nowMs - S[dev.key].sinceTs);
+      }
+    });
+  }
+
+  // --- AJAX actions (pause/unpause) ---
+  function wireAjaxForm(formId) {
+    const f = document.getElementById(formId);
+    if (!f) return;
+    f.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const btn = f.querySelector('button[type="submit"]');
+      const prevHTML = btn ? btn.innerHTML : null;
+      try {
+        if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>'; }
+        await fetch(f.action, { method: 'POST', body: new FormData(f), headers: { 'X-Requested-With': 'fetch' } });
+        fetchStatus(); // refresh immediately
+      } catch (err) {
+        console.error('Action failed:', err);
+      } finally {
+        if (btn) { btn.disabled = false; btn.innerHTML = prevHTML; }
+      }
+    });
+  }
+  function wireControls() {
+    wireAjaxForm('ap-form-pause');
+    wireAjaxForm('ap-form-unpause');
+  }
+
+  // --- Poller ---
+ function fetchStatus(){
+  if (inFlight) return;              // don't overlap requests
+  inFlight = true;
+  fetch(`/status.json?ts=${Date.now()}`, { cache:'no-store', headers:{ 'Cache-Control':'no-cache','Pragma':'no-cache' } })
+    .then(async r => {
+      const t0 = performance.now();
+      const txt = await r.text();
+      const dt = (performance.now() - t0).toFixed(0);
+      const d = JSON.parse(txt);
+      // (optional) comment out to reduce console spam at higher rates:
+      // console.debug(`[status.json OK] ${dt} ms`, d);
+      // UI updates:
+updateProfileUI(d);
+
+// show sensors if we have any real readings, regardless of profile
+const hasAnySensors =
+  Number.isFinite(Number(d.temperature_c)) ||
+  Number.isFinite(Number(d.humidity)) ||
+  Number.isFinite(Number(d.water_temperature));
+
+// render sensors (no gating — function now ignores the old 'active' flag)
+updateSensors(d);
+
+updateStatus(d);
+syncFromStatus(d);
+
+// Friendly idle banner when no profile; ok banner otherwise
+// System banner selection
+let banner;
+if (!d.profile) {
+  // No active profile -> RED, static message, no spinner/rotation
+  banner = { level: 'error', message: 'No active profile' };
+} else if (d.banner) {
+  // Use server-provided banner if present
+  banner = d.banner;
+} else {
+  // Normal OK rotation when running
+  banner = { level: 'ok', rotate: DEFAULT_ROTATE };
+}
+
+applyBanner(banner);
+
+
+
+
+
+
+    })
+    .catch(err => {
+      // console.error('status.json error', err); // keep quiet at high rate
+      if (els.systemBannerBox) {
+        els.systemBannerBox.classList.remove('banner--ok','banner--info');
+        els.systemBannerBox.classList.add('banner--warning');
+      }
+      if (els.statusIcon) els.statusIcon.innerHTML = ICONS.warning;
+    })
+    .finally(() => {
+      inFlight = false;
+      // 3) schedule the next poll *after* this one completes
+      pollTimer = setTimeout(fetchStatus, POLL_MS);
+    });
+}
+
+function start(){
+  initDom();
+  wireControls();
+  fetchStatus(); // kicks off the self-scheduling loop
+}
+window.addEventListener('load', start);
+})();
+</script>
+
+
+
+
+
+
+
+
+
+
+
+</body>
+</html>
+
+
+

@@ -1,0 +1,199 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Scale Calibration</title>
+  
+  <!-- fonts & icons -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Open+Sans:ital,wght@0,300..800;1,300..800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  /* keep your original reset */
+  html, body { margin: 0; padding: 0; }
+
+  /* make sizing predictable and avoid overflow surprises */
+  *, *::before, *::after { box-sizing: border-box; }
+
+  :root { --w: 850px; --pad: 16px; --gap: 14px; --br: 10px; }
+  body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; background:#0b0f14; color:#e7eef7; }
+  .wrap { max-width: var(--w); margin: 28px auto; padding: 0 var(--pad); }
+
+  /* Constrain the included header to the same content width without
+     assuming its exact markup (no color/layout changes) */
+  header, .header, .site-header, nav.header, nav.top, .topnav {
+    max-width: var(--w);
+    margin: 0 auto;
+    padding: 0 var(--pad);
+  }
+
+  .topbar { display:flex; align-items:center; gap:12px; margin-bottom:18px; }
+  .btn { background:#1e2a3a; color:#e7eef7; border:1px solid #2a3950; padding:8px 12px; border-radius:8px; cursor:pointer; text-decoration:none; }
+  .btn:disabled { opacity:.5; cursor:not-allowed; }
+  h1 { font-size: 22px; margin:0; }
+  .card { border:1px solid #243247; border-radius: var(--br); padding: var(--pad); background:#121925; margin-bottom:18px; }
+  .grid { display:grid; grid-template-columns: 1fr 1fr; gap: var(--gap); }
+  .field { display:flex; flex-direction:column; gap:6px; }
+  label { font-weight:600; font-size:13px; color:#aac2de; }
+  input[type=number] { width:100%; box-sizing:border-box; padding:8px; border-radius:8px; border:1px solid #2a3950; background:#0d1420; color:#e7eef7; }
+  .row { display:flex; gap:12px; align-items:center; flex-wrap:wrap; }
+  .kv { display:grid; grid-template-columns: 180px 1fr; gap:10px; }
+  .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+  .note { color:#9bb4d3; font-size:13px; padding-bottom:10px;}
+  .ok { color:#7bd88f; }
+  .warn { color:#f7c948; }
+  .bad { color:#ff7b7b; }
+  .pill { padding:2px 8px; border-radius:16px; border:1px solid #2a3950; background:#0d1420; }
+
+  /* --- Minimal responsive fixes --- */
+  @media (max-width: 700px) {
+    .grid { grid-template-columns: 1fr; }             /* stack the two columns */
+    .kv { grid-template-columns: 130px 1fr; }         /* narrower label column */
+    .topbar { flex-wrap: wrap; }                      /* prevent header text from pushing off-screen */
+  }
+  
+    .page-description {
+  margin: 0 0 28px 0;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--hint);
+}
+</style>
+
+
+
+
+</head>
+<body>
+
+  <!-- HEADER -->
+  {% include "header2.html" %}
+
+  <div class="wrap">
+    <div class="topbar">
+      <a class="btn" href="{{ url_for('home') }}">← Back</a>
+      <h1>Scale Calibration</h1>
+    </div>
+    
+        <!-- Page description -->
+<div class="page-description">
+  <p>
+    Scale settings calibrate the reservoir load cell so the controller can translate raw weight 
+    into meaningful water levels. By entering the empty and full weights, the system knows how 
+    much usable water is available.
+  </p>
+</div>
+
+    <div class="card">
+      <div class="row" style="justify-content:space-between;">
+        <div>
+          <div class="note">Live reading (median of samples)</div>
+          <div class="kv mono">
+            <div>Raw counts:</div> <div id="counts">—</div>
+            <div>Water (kg):</div> <div id="water">—</div>
+            <div>Gross (kg):</div> <div id="gross">—</div>
+            <div>Status:</div> <div id="label" class="pill">—</div>
+          </div>
+        </div>
+        <div>
+          <div class="note">Current calibration</div>
+          <div class="kv mono">
+            <div>Baseline:</div> <div id="cal_baseline">—</div>
+            <div>Counts per kg:</div> <div id="cal_slope">—</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="grid">
+        <div>
+          <div class="field">
+            <label>Step 1: Capture baseline (empty platform)</label>
+            <button id="btnBaseline" class="btn">Capture baseline</button>
+            <div class="note">Make sure the reservoir/plate is empty and still.</div>
+            <div class="mono" id="baselineOut">baseline: —</div>
+          </div>
+        </div>
+        <div>
+          <div class="field">
+            <label>Step 2: Place a known mass and enter its weight (kg)</label>
+            <input id="knownKg" type="number" step="0.001" min="0" placeholder="e.g. 5.000">
+            <button id="btnCommit" class="btn" disabled>Measure & Save</button>
+            <div class="note">Use a reasonably heavy, known mass (≥10% of your working range).</div>
+            <div class="mono" id="commitOut">counts_per_kg: —</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+<script>
+let pollTimer = null;
+
+function nfmt(x, d=3) {
+  if (x === null || x === undefined) return "—";
+  return (+x).toFixed(d);
+}
+
+async function poll() {
+  try {
+    const r = await fetch("{{ url_for('scale.api_scale_raw') }}");
+    const j = await r.json();
+    document.getElementById("counts").textContent = j.counts ?? "—";
+    document.getElementById("water").textContent  = nfmt(j.water_kg);
+    document.getElementById("gross").textContent  = nfmt(j.gross_kg);
+    document.getElementById("label").textContent  = j.label || "—";
+    document.getElementById("cal_baseline").textContent = j.cal?.baseline_counts?.toFixed ? j.cal.baseline_counts.toFixed(1) : "—";
+    document.getElementById("cal_slope").textContent    = j.cal?.counts_per_kg?.toFixed ? j.cal.counts_per_kg.toFixed(3) : "—";
+    document.getElementById("baselineOut").textContent  = "baseline: " + (j.baseline_session ?? "—");
+  } catch(e) {
+    console.log(e);
+  }
+}
+
+document.getElementById("btnBaseline").onclick = async () => {
+  try {
+    const r = await fetch("{{ url_for('scale.api_scale_cal_start') }}", {method:"POST"});
+    const j = await r.json();
+    if (!j.ok) { alert(j.error || "Failed to capture baseline"); return; }
+    document.getElementById("baselineOut").textContent = "baseline: " + j.baseline_counts.toFixed(1);
+    document.getElementById("btnCommit").disabled = false;
+  } catch(e) {
+    alert("Baseline error");
+  }
+};
+
+document.getElementById("btnCommit").onclick = async () => {
+  const kg = parseFloat(document.getElementById("knownKg").value);
+  if (!(kg > 0)) { alert("Enter a known mass in kg."); return; }
+  try {
+    const r = await fetch("{{ url_for('scale.api_scale_cal_commit') }}", {
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({known_mass_kg: kg})
+    });
+    const j = await r.json();
+    if (!j.ok) { alert(j.error || "Failed to save calibration"); return; }
+    document.getElementById("commitOut").textContent = "counts_per_kg: " + j.saved.counts_per_kg.toFixed(3);
+    // re-poll so the "Current calibration" shows immediately
+    poll();
+    // disable commit until new baseline is captured
+    document.getElementById("btnCommit").disabled = true;
+  } catch(e) {
+    alert("Commit error");
+  }
+};
+
+poll();
+pollTimer = setInterval(poll, 650);
+</script>
+</body>
+</html>
+
+
+

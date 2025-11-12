@@ -1,0 +1,300 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Reservoir Renewal — Step 2</title>
+
+  <!-- fonts & icons -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Open+Sans:ital,wght@0,300..800;1,300..800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <style>
+    :root {
+      --w: 850px; --pad:16px; --gap:14px; --br:10px;
+      --ink:#e7eef7; --muted:#aac2de; --hint:#9bb4d3;
+      --bg:#0b0f14; --card:#121925; --border:#243247; --well:#0d1420; --well2:#1e2a3a;
+      --ok:#7bd88f; --warn:#f7c948; --bad:#ff7b7b; --accent:#ADFB13;
+    }
+    html, body { margin:0; padding:0; }
+    *, *::before, *::after { box-sizing:border-box; }
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; background:var(--bg); color:var(--ink); }
+
+    .wrap { max-width:var(--w); margin:34px auto; padding:0 calc(var(--pad) + 2px); }
+    .pill { padding:2px 8px; border-radius:16px; border:1px solid #2a3950; background:var(--well); color:var(--muted); font-size:12px; }
+    .btn { font-size:14px; background:var(--well2); color:var(--ink); border:1px solid #2a3950; padding:9px 14px; border-radius:8px; cursor:pointer; text-decoration:none; font-weight:600; }
+    .btn-grey { background:#1a2535; color:#7a8ca8; border-color:#2a3950; }
+    .btn-green { background:var(--accent); color:#121212; border-color:var(--accent); }
+    
+    .muted { color:var(--muted); }
+
+    .stepper-wide { display:flex; gap:8px; width:100%; margin:0 0 16px 0; }
+    .stepper-wide .seg { flex:1; height:26px; border-radius:6px; background:#2a3950;
+      display:flex; align-items:center; justify-content:center;
+      font-size:12px; color:#a9b8cf; letter-spacing:0.2px; }
+    .stepper-wide .seg.active { background:var(--accent); color:#121212; font-weight:600; }
+    /* NEW: make the segments clickable and tidy the check icon */
+    .stepper-wide a.seg { text-decoration:none; }
+    .stepper-wide .seg[aria-current="step"] { pointer-events:none; cursor:default; }
+    .stepper-wide .seg .fa-check { margin-right:6px; font-size:12px; }
+
+    .stepbar { display:flex; align-items:center; justify-content:space-between; margin:30px 0 40px 0; }
+    h1 { font-size:22px; margin:0; }
+
+    fieldset.box {
+      border:1px solid var(--border); border-radius:8px; background:var(--card);
+      padding:var(--pad); margin:0 0 18px 0;
+    }
+
+    .grid { display:grid; gap:18px; grid-template-columns: 1fr; }
+
+    .progress { width:100%; height:48px; background:#0c141f; border:1px solid #22324a; border-radius:4px; overflow:hidden; position:relative; }
+    .progress>.fill { height:100%; width:0%; transition:width .12s linear;
+      background:linear-gradient(90deg,#0171E3,#39B8FF);
+      --seg-w:9px;--seg-gap:3px;
+      -webkit-mask:repeating-linear-gradient(90deg,#000 0 calc(var(--seg-w)),transparent calc(var(--seg-w)) calc(var(--seg-w)+var(--seg-gap)));
+      mask:repeating-linear-gradient(90deg,#000 0 calc(var(--seg-w)),transparent calc(var(--seg-w)) calc(var(--seg-w)+var(--seg-gap)));
+      box-shadow:inset 0 0 0 1px rgba(123,216,143,.06); }
+    /* CLEARER % LABEL: slightly larger + bolder + brighter */
+    .progress .label {
+      position:absolute; top:50%; left:12px; transform:translateY(-50%);
+      font-size:15px; font-weight:700; color:var(--ink);
+      text-shadow:0 1px 2px rgba(0,0,0,.6);
+    }
+
+    .fine { position:relative; height:56px; border:1px solid #22324a; background:#0c141f; border-radius:4px; overflow:hidden; }
+    .fine .zones { position:absolute; inset:0; display:grid; grid-template-columns: 1fr 120px 1fr; }
+    .fine .zone-under,.fine .zone-over { background:rgba(255,123,123,0.06); }
+    .fine .zone-sweet { background:rgba(173,251,19,0.12); border-left:1px dashed rgba(173,251,19,0.5); border-right:1px dashed rgba(173,251,19,0.5); }
+
+    /* narrow "perfect" band (unchanged) */
+    .fine .zone-perfect{
+      --perfect-w: 18px;
+      position:absolute; top:0; bottom:0; left:50%;
+      width:var(--perfect-w); transform:translateX(-50%);
+      background:rgba(173,251,19,0.35);
+      border-left:2px solid rgba(173,251,19,0.8);
+      border-right:2px solid rgba(173,251,19,0.8);
+      pointer-events:none;
+      z-index: 1;
+    }
+
+    .fine .labels { position:absolute; inset:0; display:flex; align-items:center; justify-content:space-between; padding:0 10px; font-size:12px; color:var(--hint); }
+    /* REMOVED vertical marker */
+    /* .fine .marker { ... } */
+
+    /* BIGGER DOT: 50% larger (12px -> 18px) */
+    .fine .dot {
+      position:absolute; top:50%; transform:translate(-50%,-50%); left:calc(var(--pos, 50%));
+      width:18px; height:18px; border-radius:50%; background:#39B8FF;
+      box-shadow:0 0 14px rgba(57,184,255,0.65);
+      z-index: 2;
+    }
+
+    .kv { display:flex; gap:12px 18px; flex-wrap:wrap; font-size:13px; color:var(--hint); }
+    .kv b { color:var(--ink); }
+
+    .actions { display:flex; justify-content:space-between; gap:10px; margin-top:10px; }
+    .note { font-size:12px; color:var(--hint); margin-top:6px; }
+
+  #cele-toast {
+    position: fixed;
+    z-index: 60;
+    left: 50%;
+    top: 20%;
+    transform: translateX(-50%) scale(0.9);
+    background: #121925;
+    color: #ADFB13;
+    border: 2px solid #ADFB13;
+    padding: 18px 28px;
+    border-radius: 14px;
+    font-size: 26px;
+    font-weight: 800;
+    letter-spacing: 0.5px;
+    text-align: center;
+    box-shadow:
+      0 0 20px rgba(173,251,19,0.3),
+      0 0 60px rgba(173,251,19,0.15);
+    opacity: 0;
+    transition: opacity .4s ease, transform .4s ease;
+    display: none;
+  }
+  #cele-toast.show {
+    opacity: 1;
+    transform: translateX(-50%) scale(1);
+    animation: toast-pop 0.6s ease-out;
+  }
+
+  @keyframes toast-pop {
+    0%   { transform: translateX(-50%) scale(0.8); opacity: 0; }
+    40%  { transform: translateX(-50%) scale(1.05); opacity: 1; }
+    70%  { transform: translateX(-50%) scale(0.97); }
+    100% { transform: translateX(-50%) scale(1); }
+  }
+
+    #confetti-root{ pointer-events:none; position: fixed; inset: 0; z-index: 59; overflow: hidden; }
+    .confetti{ position:absolute; width:10px; height:16px; opacity:0.9; will-change: transform, opacity; }
+  </style>
+</head>
+<body>
+  {% include "header2.html" %}
+  <div class="wrap">
+    <div class="stepper-wide" aria-label="Wizard steps">
+  {% set total = 5 %}
+  {% for i in range(1, total + 1) %}
+    {% set is_active = (i == step) %}
+    {% set is_done = (i < step) %}
+    <a class="seg {% if is_active %}active{% endif %}"
+       href="{{ url_for('reservoirs.reservoir_wizard', step=i) }}"
+       {% if is_active %}aria-current="step"{% endif %}>
+      {% if is_done %}<i class="fa fa-check" aria-hidden="true"></i>{% endif %}
+      Step {{ i }}
+    </a>
+  {% endfor %}
+</div>
+
+    <div class="stepbar">
+      <div>
+        <h1 style="margin:0 0 6px 0; font-size:22px;">Reservoir renewal</h1>
+<div class="muted" style="font-size:13px;">Step {{ step }} of 5 — Fill to target.</div>
+      </div>
+      <span class="pill" id="liveStamp">live</span>
+    </div>
+
+    <fieldset class="box">
+      <legend>Fill to target</legend>
+      <div class="grid">
+        <div class="kv">
+          <div>Target: <b><span id="targetL">—</span> L</b></div>
+          <div>Remaining: <b><span id="remainL">—</span> L</b></div>
+          <div>Measured: <b><span id="measuredL">—</span> L</b></div>
+        </div>
+
+        <div>
+          <div class="progress"><div class="fill" id="overallFill"></div><div class="label"><span id="pctLabel">--</span>%</div></div>
+          <div class="note">This bar shows progress from 0% to 100% of your target.</div>
+        </div>
+
+        <div>
+          <div class="fine">
+            <div class="zones"><div class="zone-under"></div><div class="zone-sweet"></div><div class="zone-over"></div></div>
+
+            <!-- narrow perfect band (unchanged) -->
+            <div class="zone-perfect" aria-hidden="true"></div>
+
+            <div class="labels"><span>Underfilled</span><span>Sweet spot</span><span>Overfilled</span></div>
+            <!-- removed vertical marker -->
+            <div class="dot" id="fineDot" style="--pos:50%"></div>
+          </div>
+          <div class="note">Aim to centre the marker in the green sweet spot.</div>
+        </div>
+
+        <div class="actions">
+          <div class="grow"></div>
+          <form method="post" action="{{ url_for('reservoirs.reservoir_wizard', step=2) }}">
+            <button id="nextBtn" class="btn btn-green" name="action" value="next" disabled>
+              Next step <i class="fa fa-chevron-right"></i>
+            </button>
+          </form>
+        </div>
+      </div>
+    </fieldset>
+  </div>
+
+  <div id="cele-toast">Perfect Level! 🥳</div>
+  <div id="confetti-root" aria-hidden="true"></div>
+
+<script>
+  const MAIN_INIT = {{ (main or {}) | tojson }};
+  const GS_INIT   = {{ (gs   or {}) | tojson }};
+  const $ = s => document.querySelector(s);
+  const clamp = (v,min,max)=> Math.max(min, Math.min(max, v));
+  const pct = v => (v==null || isNaN(v)) ? '--' : Math.round(v);
+
+  const elTarget = $('#targetL'), elRemain=$('#remainL'), elMeasured=$('#measuredL'),
+        elPct=$('#pctLabel'), elFill=$('#overallFill'),
+        elDot=$('#fineDot'),
+        elNext=$('#nextBtn'), elLive=$('#liveStamp');
+
+  let _prevInSweet=false, _lastCeleMs=0;
+  const CELE_COOLDOWN_MS=10000;
+  const CONFETTI_SPEED = 0.3; // keep your adjustable speed
+
+  function computeTargetLitres(dMain,dGs){
+    if (dMain && typeof dMain.target_litres==='number'&&dMain.target_litres>0) return dMain.target_litres;
+    if (dGs && typeof dGs.reservoir_target_liters==='number'&&dGs.reservoir_target_liters>0) return dGs.reservoir_target_liters;
+    const full=Number(dGs?.reservoir_full_weight_kg??0), empty=Number(dGs?.reservoir_empty_weight_kg??0), usable=full-empty;
+    return (usable>0)?usable:null;
+  }
+
+  function showToastOnce(){
+    const now=Date.now(); if(now-_lastCeleMs<CELE_COOLDOWN_MS)return; _lastCeleMs=now;
+    const t=document.getElementById('cele-toast'); if(!t)return;
+    t.style.display='block';
+    requestAnimationFrame(()=>{t.classList.add('show');setTimeout(()=>t.classList.remove('show'),1200);setTimeout(()=>t.style.display='none',3000);});
+  }
+  function burstConfetti(){
+    const root=document.getElementById('confetti-root'); if(!root)return;
+    const colors=['#ADFB13','#39B8FF','#7BD88F','#F7C948','#FF7B7B']; const N=28;
+    for(let i=0;i<N;i++){
+      const c=document.createElement('div'); c.className='confetti';
+      const x=Math.random()*window.innerWidth; c.style.left=x+'px'; c.style.top='0px';
+      c.style.background=colors[i%colors.length];
+      c.style.transform=`rotate(${(Math.random()*60-30)|0}deg)`; root.appendChild(c);
+      const dx=(Math.random()*2-1)*120, dy=window.innerHeight+100+Math.random()*200, rot=(Math.random()*720-360)|0;
+      const base=900/CONFETTI_SPEED, extra=600/CONFETTI_SPEED;
+      const dur=base+Math.random()*extra;
+      c.animate([
+        {transform:`translate(0,0) rotate(0deg)`,opacity:1},
+        {transform:`translate(${dx}px,${dy}px) rotate(${rot}deg)`,opacity:0.1}
+      ],{duration:dur,easing:'cubic-bezier(.2,.6,.2,1)'}).onfinish=()=>c.remove();
+    }
+  }
+  function celebrateOnce(){showToastOnce();burstConfetti();}
+
+  function apply(d){
+    const target=computeTargetLitres(d,GS_INIT);
+    const water=(typeof d.water_kg==='number'&&d.water_kg>=0)?d.water_kg:null;
+    elTarget.textContent=(target==null)?'—':target.toFixed(1);
+    elMeasured.textContent=(water==null)?'—':water.toFixed(1);
+    let remain=null;
+    if(target!=null&&water!=null)remain=Math.max(0,target-water);
+    if(remain==null&&typeof d.litres_to_go==='number')remain=Math.max(0,d.litres_to_go);
+    elRemain.textContent=(remain==null)?'—':remain.toFixed(2);
+    const p=(typeof d.percent==='number')?clamp(d.percent,0,100):(target!=null&&water!=null&&target>0)?clamp((water/target)*100,0,100):0;
+    elPct.textContent=pct(p); elFill.style.width=p+'%';
+    let fine=d.fine;
+    if(typeof fine!=='number'||isNaN(fine)){
+      if(target!=null&&water!=null){const delta=target-water;if(Math.abs(delta)>=1){fine=(delta>0)?0:1;}else{fine=clamp(0.5-(delta/2),0,1);}}
+      else{fine=0.5;}
+    }
+    const pos=(fine*100).toFixed(2)+'%'; elDot.style.setProperty('--pos',pos);
+    const ready=(remain!=null)?(remain<=0.02):(p>=100); elNext.disabled=!ready;
+
+    /* celebration only inside narrow "perfect" band */
+    if(target!=null&&water!=null){
+      const fineEl=document.querySelector('.fine');
+      const perfectEl=document.querySelector('.zone-perfect');
+      const fineWidthPx = fineEl ? fineEl.clientWidth : 600;
+      const perfectBandPx = perfectEl ? parseFloat(getComputedStyle(perfectEl).width) : 18;
+      const tol = (perfectBandPx / fineWidthPx) / 2;
+      const inPerfect = (fine >= 0.5 - tol && fine <= 0.5 + tol);
+
+      if(inPerfect && !_prevInSweet) celebrateOnce();
+      _prevInSweet = inPerfect;
+    }
+  }
+
+  function tickLabel(){if(elLive)elLive.textContent='live • '+new Date().toLocaleTimeString();}
+  async function poll(){try{const r=await fetch('/api/reservoirs/live',{cache:'no-store'});const j=await r.json();const d=(j&&j.main)?j.main:{};apply(d);tickLabel();}catch(e){tickLabel();}}
+
+  apply(MAIN_INIT||{}); tickLabel();
+  setInterval(poll,400); poll();
+</script>
+</body>
+</html>
+
+
