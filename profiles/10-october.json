@@ -1,0 +1,43 @@
+{
+  "name": "10-october",
+  "lighting": {
+    "on": 1,
+    "off": 1,
+    "intensity": 1
+  },
+  "pump": {
+    "on_time": 7,
+    "off_time": 1,
+    "duration_on": 1.0,
+    "duration_off": 5.0,
+    "on_duration_sec": 60,
+    "off_duration_sec": 300
+  },
+  "temperature": {
+    "min": 15.0,
+    "max": 25.0,
+    "target": 20.0
+  },
+  "humidity": {
+    "min": 40.0,
+    "max": 70.0,
+    "target": 50.0
+  },
+  "ph": {
+    "min": 1.0,
+    "max": 1.0
+  },
+  "notes": "/",
+  "nutrients": {
+    "A": {
+      "ml": 5.0,
+      "per_litres": 1.0,
+      "ml_per_l": 5.0
+    },
+    "B": {
+      "ml": 5.0,
+      "per_litres": 1.0,
+      "ml_per_l": 5.0
+    }
+  }
+}

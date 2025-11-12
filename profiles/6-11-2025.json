@@ -1,0 +1,43 @@
+{
+  "name": "6-11-2025",
+  "lighting": {
+    "on": 1,
+    "off": 11,
+    "intensity": 1
+  },
+  "pump": {
+    "on_time": 8,
+    "off_time": 23,
+    "duration_on": 1.0,
+    "duration_off": 15.0,
+    "on_duration_sec": 60,
+    "off_duration_sec": 900
+  },
+  "temperature": {
+    "min": 15.0,
+    "max": 25.0,
+    "target": 20.0
+  },
+  "humidity": {
+    "min": 20.0,
+    "max": 80.0,
+    "target": 60.0
+  },
+  "ph": {
+    "min": 1.0,
+    "max": 4.0
+  },
+  "notes": "",
+  "nutrients": {
+    "A": {
+      "ml": 4.0,
+      "per_litres": 1.0,
+      "ml_per_l": 4.0
+    },
+    "B": {
+      "ml": 4.0,
+      "per_litres": 1.0,
+      "ml_per_l": 4.0
+    }
+  }
+}

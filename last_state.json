@@ -1,0 +1,10 @@
+{
+  "running_profile": "basil_1.json",
+  "start_time": "2025-10-01T22:30:06.750248",
+  "cycle_count": 0,
+  "pump_state": "OFF",
+  "fan_state": "OFF",
+  "last_temp": 22.3435,
+  "last_humidity": 58.0,
+  "paused": false
+}
