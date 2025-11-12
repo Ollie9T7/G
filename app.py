@@ -654,40 +654,80 @@ def simulate_profile(profile_name: str, profile_data: dict):
     def _schedule_next_on(now_wall):
         return now_wall + pump_off if pump_off > 0 else now_wall
 
+    def _trigger_startup_premix(now_wall, now_mono, *, force=False):
+        """Run agitator/air premix before the main pump resumes."""
+        nonlocal next_on_due_at, agitator_timer, air_timer, agitator_started_this_cycle
+        nonlocal air_started_this_cycle, pump_state, pump_timer
+        try:
+            _ensure_gpio_mode()
+        except Exception:
+            pass
+        # Ensure the main pump is OFF so premix has exclusive control.
+        if force or status_data.get("pump_state") == "ON":
+            try:
+                if pump_configured:
+                    _set_main_pump(False)
+            except Exception:
+                pass
+            status_data["pump_state"] = "OFF"
+            status_data["pump_phase_end_ts"] = None
+            status_data["pump_time_remaining_s"] = None
+            pump_state = False
+            pump_timer = now_mono
+        agitator_started_this_cycle = False
+        air_started_this_cycle = False
+        longest = max(ag_run if ag_enabled else 0, air_run if air_enabled else 0)
+        existing_delay = 0.0
+        if next_on_due_at is not None:
+            try:
+                existing_delay = max(0.0, float(next_on_due_at - now_wall))
+            except Exception:
+                existing_delay = 0.0
+        target_delay = float(longest if longest > 0 else 0.0)
+        pump_delay = max(existing_delay, target_delay)
+        next_on_due_at = now_wall + pump_delay
+        clamp = pump_delay
+        if air_enabled and air_run > 0:
+            _set_air_pump(True)
+            status_data["air_pump_state"] = "ON"
+            air_timer = now_mono
+            air_started_this_cycle = True
+            end_by_run = air_timer + air_run
+            end_by_pump = now_mono + clamp
+            status_data["air_pump_phase_end_ts"] = min(end_by_run, end_by_pump)
+            status_data["air_pump_time_remaining_s"] = int(
+                math.ceil(max(0.0, status_data["air_pump_phase_end_ts"] - now_mono))
+            )
+        else:
+            status_data["air_pump_state"] = "OFF"
+            status_data["air_pump_phase_end_ts"] = None
+            status_data["air_pump_time_remaining_s"] = None
+        if ag_enabled and ag_run > 0:
+            _set_agitator(True)
+            status_data["agitator_state"] = "ON"
+            agitator_timer = now_mono
+            agitator_started_this_cycle = True
+            end_by_run = agitator_timer + ag_run
+            end_by_pump = now_mono + clamp
+            status_data["agitator_phase_end_ts"] = min(end_by_run, end_by_pump)
+            status_data["agitator_time_remaining_s"] = int(
+                math.ceil(max(0.0, status_data["agitator_phase_end_ts"] - now_mono))
+            )
+        else:
+            status_data["agitator_state"] = "OFF"
+            status_data["agitator_phase_end_ts"] = None
+            status_data["agitator_time_remaining_s"] = None
+        return pump_delay
+
+
+
+
     # First due time:
     if not allowed_now:
         next_on_due_at = _next_window_open_ts(win_on, win_off, now_dt=datetime.datetime.now())
     else:
         if status_data.pop("startup_kick", False) or do_crash_premix:
-            # If crash-resume had the pump ON, force it OFF immediately so premix runs first.
-            if do_crash_premix:
-                try:
-                    if pump_configured:
-                        _set_main_pump(False)
-                except Exception:
-                    pass
-                status_data["pump_state"] = "OFF"
-                status_data["pump_phase_end_ts"] = None
-                status_data["pump_time_remaining_s"] = None
-
-            # Premix first (longest determines delay), then start pump
-            longest = max(ag_run if ag_enabled else 0, air_run if air_enabled else 0)
-            next_on_due_at = now + (longest if longest > 0 else 0)
-
-            # Start premix immediately as needed (each clamped to pump start)
-            if air_enabled and air_run > 0:
-                _set_air_pump(True); status_data["air_pump_state"] = "ON"
-                air_timer = now_m; air_started_this_cycle = True
-                end_by_run  = air_timer + air_run
-                end_by_pump = now_m + max(0.0, float(next_on_due_at - now))
-                status_data["air_pump_phase_end_ts"] = min(end_by_run, end_by_pump)
-
-            if ag_enabled and ag_run > 0:
-                _set_agitator(True); status_data["agitator_state"] = "ON"
-                agitator_timer = now_m; agitator_started_this_cycle = True
-                end_by_run  = agitator_timer + ag_run
-                end_by_pump = now_m + max(0.0, float(next_on_due_at - now))
-                status_data["agitator_phase_end_ts"] = min(end_by_run, end_by_pump)
+            _trigger_startup_premix(now, now_m, force=do_crash_premix)
         else:
             next_on_due_at = now  # start immediately
 
@@ -1389,6 +1429,11 @@ def simulate_profile(profile_name: str, profile_data: dict):
                 status_data["air_pump_phase_end_ts"] = None
                 status_data["air_pump_time_remaining_s"] = None
         else:
+            if status_data.get("startup_kick", False):
+                status_data.pop("startup_kick", None)
+                _trigger_startup_premix(now, now_m)
+
+
             if status_data.get("pump_state") != "ON":
                 if next_on_due_at is None:
                     next_on_due_at = _schedule_next_on(now)

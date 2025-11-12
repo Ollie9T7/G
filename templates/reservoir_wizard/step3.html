@@ -746,12 +746,12 @@
     paintNeeded(NUTS_INIT, liveLitres);
   }
   
-  // Unpause via local endpoint, then go straight to Step 5 (Step 4 is skipped)
+  // Resume the profile via local endpoint, then advance to the next step
   async function goNextUnpauseThenStep5() {
     const btn = document.getElementById('nextBtn');
     const prev = btn.innerHTML;
     btn.disabled = true;
-    btn.innerHTML = 'Unpausing…';
+    btn.innerHTML = 'Resuming & mixing…';
 
     try {
       const res = await fetch('/api/reservoirs/unpause', {
@@ -760,16 +760,28 @@
         credentials: 'same-origin',
         body: '{}' // harmless, avoids empty-body issues on some servers
       });
-      if (!res.ok) {
-        const txt = await res.text();
-        alert(`Failed to unpause. HTTP ${res.status}\n${txt || '(no body)'}`);
+
+      const raw = await res.text();
+      let data = null;
+      if (raw) {
+        try {
+          data = JSON.parse(raw);
+        } catch (err) {
+          data = null;
+        }
+      }
+
+      if (!res.ok || !data || data.ok !== true) {
+        const errMsg = (data && (data.error || data.message)) || raw || 'Unknown error';
+        alert(`Failed to resume and mix. ${errMsg}`);
         throw new Error('unpause failed');
       }
-      // Skip old Step 4 – go to Step 5
+
       window.location.assign('/reservoirs/wizard?step=4');
     } catch (e) {
       btn.disabled = false;
       btn.innerHTML = prev;
+      console.error(e);
     }
   }
 

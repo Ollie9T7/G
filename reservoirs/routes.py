@@ -582,6 +582,68 @@ def api_reservoirs_renewal_end():
     return jsonify({"ok": True})
 
 
+@reservoirs_bp.route("/api/reservoirs/unpause", methods=["POST"])
+def api_reservoirs_unpause():
+    """Resume the paused profile and request a premix cycle via startup_kick."""
+
+    ctx = _CTX()
+    sd = ctx["status_data"]
+    get_running = ctx.get("get_running_profile")
+    running_profile = get_running() if callable(get_running) else None
+
+    if not running_profile:
+        return jsonify({"ok": False, "error": "no_active_profile"}), 409
+
+    was_paused = bool(sd.get("paused", False))
+    sd["paused"] = False
+
+    try:
+        sd["startup_kick"] = True
+    except Exception:
+        pass
+
+    gs = ctx["load_global_settings"]()
+    agitator_enabled = bool(gs.get("agitator_enabled"))
+    agitator_seconds = int(gs.get("agitator_run_sec") or 0) if agitator_enabled else 0
+    air_enabled = bool(gs.get("air_pump_enabled"))
+    air_seconds = int(gs.get("air_pump_run_sec") or 0) if air_enabled else 0
+
+    try:
+        ctx["_ensure_gpio_mode"]()
+    except Exception:
+        pass
+
+    try:
+        ctx["apply_outputs_from_status"]()
+    except Exception:
+        pass
+
+    try:
+        ctx["LOGGER"].log_event(
+            "reservoir_renewal",
+            "Reservoir renewal: resumed and premix triggered",
+            reason_code="resume_mix",
+            profile_id=running_profile,
+            payload={
+                "was_paused": was_paused,
+                "agitator_seconds": agitator_seconds,
+                "air_pump_seconds": air_seconds,
+            },
+        )
+    except Exception:
+        pass
+
+    return jsonify(
+        {
+            "ok": True,
+            "profile": running_profile,
+            "was_paused": was_paused,
+            "agitator_seconds": agitator_seconds,
+            "air_pump_seconds": air_seconds,
+        }
+    )
+
+
 
 
 
