@@ -1,0 +1,31 @@
+{
+  "name": "New Log Profile",
+  "lighting": {
+    "on": 8,
+    "off": 22,
+    "intensity": 100
+  },
+  "pump": {
+    "on_time": 8,
+    "off_time": 22,
+    "duration_on": 1.0,
+    "duration_off": 15.0,
+    "on_duration_sec": 60,
+    "off_duration_sec": 900
+  },
+  "temperature": {
+    "min": 15.0,
+    "max": 25.0,
+    "target": 20.0
+  },
+  "humidity": {
+    "min": 30.0,
+    "max": 70.0,
+    "target": 50.0
+  },
+  "ph": {
+    "min": 1.0,
+    "max": 2.0
+  },
+  "notes": ""
+}

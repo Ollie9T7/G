@@ -1,0 +1,41 @@
+{
+  "name": "Lettuce",
+  "scale": {
+    "length_cm": 1.0,
+    "width_cm": 2.0,
+    "height_cm": 3.0
+  },
+  "lighting": {
+    "start_hour": 0,
+    "end_hour": 23,
+    "intensity_percent": 100
+  },
+  "pump": {
+    "window": {
+      "start_hour": 8,
+      "end_hour": 23
+    },
+    "on_duration_sec": 20,
+    "off_duration_sec": 10
+  },
+  "temperature": {
+    "min": 20.0,
+    "target": 25.0,
+    "max": 30.0
+  },
+  "humidity": {
+    "min": 20.0,
+    "target": 60.0,
+    "max": 80.0
+  },
+  "water": {
+    "temperature": {
+      "min": 0.0,
+      "target": 0.0,
+      "max": 0.0
+    },
+    "quantity": {
+      "min": 0.0
+    }
+  }
+}

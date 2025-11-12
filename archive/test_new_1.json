@@ -1,0 +1,31 @@
+{
+  "name": "test new 1",
+  "lighting": {
+    "on": 1,
+    "off": 1,
+    "intensity": 0
+  },
+  "pump": {
+    "on_time": 0,
+    "off_time": 0,
+    "duration_on": 0.0,
+    "duration_off": 0.0,
+    "on_duration_sec": 0,
+    "off_duration_sec": 0
+  },
+  "temperature": {
+    "min": 0.0,
+    "max": 0.0,
+    "target": 0.0
+  },
+  "humidity": {
+    "min": 0.0,
+    "max": 0.0,
+    "target": 0.0
+  },
+  "ph": {
+    "min": 0.0,
+    "max": 0.0
+  },
+  "notes": "1"
+}

@@ -1,0 +1,31 @@
+{
+  "name": "test 3",
+  "lighting": {
+    "on": 1,
+    "off": 2,
+    "intensity": 3
+  },
+  "pump": {
+    "on_time": 1,
+    "off_time": 2,
+    "duration_on": 3.0,
+    "duration_off": 4.0,
+    "on_duration_sec": 180,
+    "off_duration_sec": 240
+  },
+  "temperature": {
+    "min": 1.0,
+    "max": 2.0,
+    "target": 3.0
+  },
+  "humidity": {
+    "min": 1.0,
+    "max": 2.0,
+    "target": 3.0
+  },
+  "ph": {
+    "min": 1.0,
+    "max": 2.0
+  },
+  "notes": "notes"
+}

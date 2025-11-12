@@ -1,0 +1,31 @@
+{
+  "name": "testing-log",
+  "lighting": {
+    "on": 2,
+    "off": 1,
+    "intensity": 1
+  },
+  "pump": {
+    "on_time": 7,
+    "off_time": 22,
+    "duration_on": 1.0,
+    "duration_off": 20.0,
+    "on_duration_sec": 60,
+    "off_duration_sec": 1200
+  },
+  "temperature": {
+    "min": 20.0,
+    "max": 25.0,
+    "target": 22.0
+  },
+  "humidity": {
+    "min": 10.0,
+    "max": 70.0,
+    "target": 50.0
+  },
+  "ph": {
+    "min": 1.0,
+    "max": 2.0
+  },
+  "notes": ""
+}

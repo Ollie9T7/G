@@ -1,0 +1,31 @@
+{
+  "name": "test (copy)",
+  "lighting": {
+    "on": 1,
+    "off": 1,
+    "intensity": 1
+  },
+  "pump": {
+    "on_time": 1,
+    "off_time": 1,
+    "duration_on": 1.0,
+    "duration_off": 1.0,
+    "on_duration_sec": 60,
+    "off_duration_sec": 60
+  },
+  "temperature": {
+    "min": 1.0,
+    "max": 1.0,
+    "target": 1.0
+  },
+  "humidity": {
+    "min": 1.0,
+    "max": 1.0,
+    "target": 1.0
+  },
+  "ph": {
+    "min": 1.0,
+    "max": 1.0
+  },
+  "notes": "1"
+}

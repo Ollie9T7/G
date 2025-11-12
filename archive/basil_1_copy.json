@@ -1,0 +1,44 @@
+{
+  "name": "basil 1 (copy)",
+  "scale": {
+    "length_cm": 99.0,
+    "width_cm": 109.0,
+    "height_cm": 49.0
+  },
+  "lighting": {
+    "start_hour": 9,
+    "end_hour": 22,
+    "intensity_percent": 100,
+    "on": 8,
+    "off": 23,
+    "intensity": 100
+  },
+  "pump": {
+    "window": {
+      "start_hour": 0,
+      "end_hour": 23
+    },
+    "on_duration_sec": 60,
+    "off_duration_sec": 900,
+    "on_time": 8,
+    "off_time": 23,
+    "duration_on": 1.0,
+    "duration_off": 15.0
+  },
+  "temperature": {
+    "min": 20.0,
+    "target": 24.0,
+    "max": 28.0
+  },
+  "humidity": {
+    "min": 20.0,
+    "target": 70.0,
+    "max": 80.0
+  },
+  "water": {},
+  "ph": {
+    "min": 1.0,
+    "max": 4.0
+  },
+  "notes": "notes here"
+}
