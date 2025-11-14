@@ -264,144 +264,15 @@ function toSeconds(value){
   return n < 0 ? 0 : n;
 }
 
-function toFiniteNumber(value){
-  if (value === null || value === undefined) return null;
-  const n = Number(value);
-  return Number.isFinite(n) ? n : null;
-}
-
-function deriveRemainingSeconds(remRaw, phaseEndRaw, monoNowRaw){
-  const direct = toSeconds(remRaw);
-  if (direct !== null) return direct;
-
-  const phaseEnd = toFiniteNumber(phaseEndRaw);
-  const monoNow  = toFiniteNumber(monoNowRaw);
-  if (phaseEnd === null || monoNow === null) return null;
-
-  const diff = phaseEnd - monoNow;
-  if (!Number.isFinite(diff)) return null;
-  return diff > 0 ? diff : 0;
-}
-
 const phaseState = {
-  ag: {
-    required: agPlanSec > 0,
-    running: false,
-    complete: agPlanSec <= 0,
-    everRan: false,
-    timer: null,
-    startedPerf: null,
-    plan: agPlanSec,
-    lastRemaining: null,
-    animPrimed: false,
-    lastFillPct: null,
-  },
-  air: {
-    required: airPlanSec > 0,
-    running: false,
-    complete: airPlanSec <= 0,
-    everRan: false,
-    timer: null,
-    startedPerf: null,
-    plan: airPlanSec,
-    lastRemaining: null,
-    animPrimed: false,
-    lastFillPct: null,
-  },
+  ag: { required: agPlanSec > 0, running: false, complete: agPlanSec <= 0, everRan: false, idleSince: null },
+  air: { required: airPlanSec > 0, running: false, complete: airPlanSec <= 0, everRan: false, idleSince: null },
 };
+
+const IDLE_ASSUME_DONE_MS = 5000;
 
 let firstStatusApplied = false;
 let pollHandle = null;
-
-function clearPhaseTimer(st){
-  if (st.timer){
-    clearInterval(st.timer);
-    st.timer = null;
-  }
-}
-
-function resetFill(fillEl){
-  fillEl.classList.remove('done');
-  fillEl.style.transition = 'none';
-  fillEl.style.width = '0%';
-}
-
-function primeFill(fillEl, planSeconds, remainingSeconds){
-  if (!fillEl) return 0;
-  const plan = Math.max(0, Number(planSeconds) || 0);
-  const remaining = (typeof remainingSeconds === 'number' && Number.isFinite(remainingSeconds))
-    ? Math.max(0, Math.min(plan, remainingSeconds))
-    : null;
-
-  if (plan <= 0){
-    resetFill(fillEl);
-    return 0;
-  }
-
-  const elapsed = (remaining !== null) ? Math.max(0, plan - remaining) : 0;
-  const pct = Math.min(100, Math.max(0, (elapsed / plan) * 100));
-
-  fillEl.classList.remove('done');
-  fillEl.style.transition = 'none';
-  fillEl.style.width = pct + '%';
-
-  return pct;
-}
-
-function startPhaseTimer(st, planSeconds, etaEl, fillEl){
-  clearPhaseTimer(st);
-  const plan = Math.max(0, Number(planSeconds) || 0);
-  if (!(plan > 0) || !st.startedPerf){
-    etaEl.textContent = '—';
-    return;
-  }
-
-  const tick = () => {
-    const elapsed = Math.max(0, (performance.now()/1000) - st.startedPerf);
-    const leftRaw = plan - elapsed;
-    const left = Math.max(0, leftRaw);
-    etaEl.textContent = left > 0 ? fmt(left) : '0s';
-
-    if (fillEl && plan > 0){
-      const bounded = Math.min(plan, elapsed);
-      let pct = Math.min(100, (bounded / plan) * 100);
-      if (st.running && left <= 0.1) {
-        pct = Math.min(pct, 99.9);
-      } else if (left > 0.1) {
-        pct = Math.min(pct, 99.5);
-      }
-      if (st.lastFillPct === null || Math.abs(pct - st.lastFillPct) >= 0.2) {
-        fillEl.style.transition = 'width 0.2s linear';
-        fillEl.style.width = pct + '%';
-        st.lastFillPct = pct;
-      }
-    }
-
-    if (left <= 0 && !st.running){
-      clearPhaseTimer(st);
-    }
-  };
-
-  tick();
-  st.timer = setInterval(tick, 200);
-}
-
-function completePhase(st, statusEl, etaEl, fillEl){
-  st.running = false;
-  st.complete = true;
-  st.everRan = true;
-  st.startedPerf = null;
-  st.lastRemaining = 0;
-  st.animPrimed = false;
-  st.lastFillPct = 100;
-  clearPhaseTimer(st);
-
-  statusEl.textContent = 'Done';
-  etaEl.textContent = '0s';
-  fillEl.classList.add('done');
-  fillEl.style.transition = 'none';
-  fillEl.style.width = '100%';
-}
 
 function updatePhase(which, planSeconds, stateStr, remainingSeconds){
   const statusEl = which === 'ag' ? agStatus : airStatus;
@@ -410,87 +281,83 @@ function updatePhase(which, planSeconds, stateStr, remainingSeconds){
   const st       = phaseState[which];
 
   const plan = Math.max(0, Number(planSeconds) || 0);
-  const prevPlan = st.plan;
   const stateUpper = (stateStr || '').toString().trim().toUpperCase();
-  const remaining = (typeof remainingSeconds === 'number' && Number.isFinite(remainingSeconds))
-    ? Math.max(0, Math.min(plan, remainingSeconds))
-    : null;
+  const remaining = (typeof remainingSeconds === 'number' && Number.isFinite(remainingSeconds)) ? Math.max(0, remainingSeconds) : null;
 
-  st.plan = plan;
   st.required = plan > 0;
+  st.running = false;
+  st.complete = !st.required;
+
+  fillEl.classList.remove('done');
 
   if (!st.required){
-    st.running = false;
-    st.complete = true;
     st.everRan = false;
-    st.startedPerf = null;
-    st.lastRemaining = null;
-    st.animPrimed = false;
-    st.lastFillPct = 0;
-    clearPhaseTimer(st);
+    st.idleSince = null;
     statusEl.textContent = 'Not required';
     etaEl.textContent = '—';
-    resetFill(fillEl);
+    fillEl.style.width = '0%';
     return;
   }
 
-  const isRunning = stateUpper === 'ON';
+  st.complete = false;
 
-  if (isRunning && remaining !== null && st.lastRemaining !== null && remaining > st.lastRemaining) {
-    const nearRestart = remaining >= Math.max(plan - 0.35, plan * 0.75);
-    const wasAtZero  = st.lastRemaining <= 0.35;
-    if (!(nearRestart && wasAtZero)) {
-      remaining = st.lastRemaining;
-    }
-  }
+  const isRunning = (stateUpper === 'ON') || (remaining !== null && remaining > 0);
 
   if (isRunning){
     st.running = true;
-    st.complete = false;
     st.everRan = true;
+    st.idleSince = null;
     statusEl.textContent = 'Running';
     etaEl.textContent = (remaining !== null) ? fmt(remaining) : '—';
-
     if (plan > 0 && remaining !== null){
-      st.startedPerf = (performance.now()/1000) - Math.max(0, plan - remaining);
+      const pct = Math.min(100, Math.max(0, ((plan - remaining) / plan) * 100));
+      fillEl.style.width = pct + '%';
+    } else if (st.everRan) {
+      fillEl.style.width = '100%';
     } else {
-      st.startedPerf = null;
-    }
-
-    const shouldPrime = !st.animPrimed || plan !== prevPlan || (remaining !== null && (st.lastRemaining === null || remaining > st.lastRemaining + 0.25));
-    if (shouldPrime){
-      const primed = primeFill(fillEl, plan, remaining);
-      if (Number.isFinite(primed)) {
-        st.lastFillPct = primed;
-      }
-      st.animPrimed = true;
-    }
-
-    st.lastRemaining = remaining;
-    if (remaining !== null){
-      startPhaseTimer(st, plan, etaEl, fillEl);
-    } else {
-      clearPhaseTimer(st);
+      fillEl.style.width = '0%';
     }
     return;
   }
 
-  // Not running
-  clearPhaseTimer(st);
-  st.running = false;
-
-  if (remaining === 0 || st.everRan){
-    completePhase(st, statusEl, etaEl, fillEl);
-  } else {
-    st.complete = false;
-    st.animPrimed = false;
-    st.startedPerf = null;
-    st.lastRemaining = remaining;
-    st.lastFillPct = 0;
-    statusEl.textContent = 'Idle';
-    etaEl.textContent = '—';
-    resetFill(fillEl);
+  if (remaining === 0){
+    st.running = false;
+    st.complete = true;
+    st.everRan = true;
+    st.idleSince = null;
+    statusEl.textContent = 'Done';
+    etaEl.textContent = '0s';
+    fillEl.classList.add('done');
+    fillEl.style.width = '100%';
+    return;
   }
+
+  if (st.everRan){
+    st.complete = true;
+    st.idleSince = null;
+    statusEl.textContent = 'Done';
+    etaEl.textContent = '0s';
+    fillEl.classList.add('done');
+    fillEl.style.width = '100%';
+    return;
+  }
+
+  if (st.idleSince === null){
+    st.idleSince = Date.now();
+  } else if ((Date.now() - st.idleSince) >= IDLE_ASSUME_DONE_MS){
+    st.complete = true;
+    st.everRan = true;
+    st.idleSince = null;
+    statusEl.textContent = 'Done';
+    etaEl.textContent = '0s';
+    fillEl.classList.add('done');
+    fillEl.style.width = '100%';
+    return;
+  }
+
+  statusEl.textContent = 'Idle';
+  etaEl.textContent = '—';
+  fillEl.style.width = '0%';
 }
 
 function updateFinishState(){
@@ -533,12 +400,8 @@ function applyStatusPayload(payload){
     document.getElementById('airPlan').textContent = String(Math.round(airPlanSec));
   }
 
-  const monoNow = toFiniteNumber(payload.status_mono_now);
-  const agRemaining = deriveRemainingSeconds(payload.agitator_time_remaining_s, payload.agitator_phase_end_ts, monoNow);
-  const airRemaining = deriveRemainingSeconds(payload.air_pump_time_remaining_s, payload.air_pump_phase_end_ts, monoNow);
-
-  updatePhase('ag', agPlanSec, payload.agitator_state, agRemaining);
-  updatePhase('air', airPlanSec, payload.air_pump_state, airRemaining);
+  updatePhase('ag', agPlanSec, payload.agitator_state, toSeconds(payload.agitator_time_remaining_s));
+  updatePhase('air', airPlanSec, payload.air_pump_state, toSeconds(payload.air_pump_time_remaining_s));
 
   firstStatusApplied = true;
   updateFinishState();
