@@ -65,6 +65,21 @@
     .pill { padding:2px 8px; border-radius:16px; border:1px solid #2a3950; background:var(--well); color:var(--muted); font-size:12px; }
     .page-description { margin: 0 0 25px 0; font-size: 14px; line-height: 1.5; color: var(--hint); }
 
+    .flash {
+      margin-bottom: 18px;
+      padding: 12px 14px;
+      border-radius: 8px;
+      border: 1px solid #295736;
+      background: #14261a;
+      color: #b6f2c1;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 14px;
+    }
+    .flash i { color: #adfb13; }
+    .flash .flash-time { color: #e7eef7; font-weight: 600; }
+
     /* === FIELDSET style to match Global Settings look === */
     fieldset.res-box {
       border:1px solid var(--border);
@@ -172,6 +187,16 @@
   {% include "header2.html" %}
 
   <div class="wrap">
+    {% set completion_message = request.args.get('message') %}
+    {% if completion_message == 'renewal_complete' %}
+      <div class="flash" role="status">
+        <i class="fa-solid fa-circle-check"></i>
+        <span>
+          Reservoir renewal complete{% if request.args.get('profile') %} for <span class="flash-time">{{ request.args.get('profile') }}</span>{% endif %}{% if request.args.get('completed_local') %} at <span class="flash-time">{{ request.args.get('completed_local') }}</span>{% endif %}.
+        </span>
+      </div>
+    {% endif %}
+
     <div class="topbar">
       <h1>Reservoir Management</h1>
       <span class="pill mono" id="liveStamp">live</span>

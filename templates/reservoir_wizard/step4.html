@@ -82,6 +82,31 @@
       transition: box-shadow .18s ease, border-color .18s ease, background .18s ease, color .18s ease, transform .05s ease;
       box-shadow: inset 0 0 0 0 rgba(173,251,19,0);
     }
+    .run-status {
+      width:100%;
+      border-radius:999px;
+      background:#1b2433;
+      border:1px solid #2a3950;
+      color:#9bb4d3;
+      font-size:15px;
+      font-weight:600;
+      letter-spacing:.2px;
+      padding:12px 18px;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      gap:10px;
+    }
+    .run-status.ready {
+      background:#142619;
+      border-color:#295736;
+      color:#a5f3b5;
+    }
+    .run-status.error {
+      background:#3a1414;
+      border-color:#6b1f1f;
+      color:#ffb4b4;
+    }
     .run-btn-wide:hover:not([disabled]):not(.is-running){
       border-color: #0171e3;
       box-shadow: 0 0 0 2px rgba(1,113,227,0.18), 0 0 14px rgba(1,113,227,0.28);
@@ -105,9 +130,9 @@
   {% include "header2.html" %}
   <div class="wrap">
 
-    <!-- IDENTICAL STEPPER TO STEP 3 (now 5 steps total) -->
+    <!-- IDENTICAL STEPPER TO STEP 3 (now 4 steps total) -->
     <div class="stepper-wide" aria-label="Wizard steps">
-      {% set total = 5 %}
+      {% set total = 4 %}
       {% for i in range(1, total + 1) %}
         {% set is_active = (i == step) %}
         {% set is_done = (i < step) %}
@@ -123,7 +148,7 @@
     <div class="stepbar">
       <div>
         <h1 style="margin:0 0 6px 0; font-size:22px;">Reservoir renewal</h1>
-        <div class="muted" style="font-size:13px;">Step {{ step }} of 5 — Mix and aerate the reservoir.</div>
+        <div class="muted" style="font-size:13px;">Step {{ step }} of 4 — Premix the reservoir.</div>
       </div>
       <span class="pill" id="liveStamp">live</span>
     </div>
@@ -139,12 +164,12 @@
 
     <!-- Action + progress (styled like dosing cards) -->
     <fieldset class="box">
-      <legend>Run mix & aerate</legend>
+      <legend>Premix status</legend>
 
       <div class="run-wide" style="gap:10px;">
-        <button id="mixBtn" class="run-btn-wide" type="button">
-          <i class="fa-solid fa-water"></i> Mix and aerate reservoir
-        </button>
+        <div id="mixStatus" class="run-status">
+          <i class="fa-solid fa-spinner fa-spin"></i> Premix running…
+        </div>
       </div>
 
       <div class="grid-2" style="margin-top:14px;">
@@ -168,14 +193,14 @@
       </div>
 
       <div class="actions">
-        <div></div>
-        <a class="btn btn-green" id="nextBtn" href="{{ url_for('reservoirs.reservoir_wizard', step=5) }}" style="display:none;">
-          Next step <i class="fa fa-chevron-right"></i>
-        </a>
+        <div class="note" style="margin:0;">Finish becomes available once the premix cycle ends.</div>
+        <button class="btn btn-green" id="finishBtn" type="button" disabled aria-disabled="true">
+          Finish renewal <i class="fa-solid fa-flag-checkered"></i>
+        </button>
       </div>
 
       <div class="note">
-        Both devices start together and stop exactly when their timers finish.
+        Keep this page open—mixing and aeration run automatically based on the plan above.
       </div>
     </fieldset>
   </div>
@@ -193,100 +218,289 @@ if (mixOverride !== null) {
   document.getElementById('airPlan').textContent = String(airPlanSec);
 }
 
+const finishBtn   = document.getElementById('finishBtn');
+const mixStatus   = document.getElementById('mixStatus');
+const agStatus    = document.getElementById('agStatus');
+const airStatus   = document.getElementById('airStatus');
+const agEta       = document.getElementById('agEta');
+const airEta      = document.getElementById('airEta');
+const agFill      = document.getElementById('agFill');
+const airFill     = document.getElementById('airFill');
 
+const PROFILE_NAME     = {{ (selected_profile_name or '') | tojson }};
+const COMPLETE_URL     = {{ url_for('reservoirs.api_reservoirs_complete') | tojson }};
+const RENEWAL_END_URL  = {{ url_for('reservoirs.api_reservoirs_renewal_end') | tojson }};
+const REDIRECT_URL     = {{ url_for('reservoirs.reservoirs_page') | tojson }};
+const STATUS_URL       = {{ url_for('system.status_json') | tojson }};
+const POLL_INTERVAL_MS = 1000;
 
+function fmt(s){
+  s = Math.max(0, Math.round(s));
+  const m = Math.floor(s/60), ss = s % 60;
+  return m > 0 ? `${m}:${String(ss).padStart(2,'0')}` : `${ss}s`;
+}
 
-  const btn     = document.getElementById('mixBtn');
-  const nextBtn = document.getElementById('nextBtn');
+function setStatusRunning(message){
+  mixStatus.classList.remove('ready', 'error');
+  mixStatus.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> ${message || 'Mixing reservoir…'}`;
+}
 
-  const agStatus = document.getElementById('agStatus');
-  const airStatus= document.getElementById('airStatus');
-  const agEta    = document.getElementById('agEta');
-  const airEta   = document.getElementById('airEta');
-  const agFill   = document.getElementById('agFill');
-  const airFill  = document.getElementById('airFill');
+function setStatusComplete(message){
+  mixStatus.classList.remove('error');
+  mixStatus.classList.add('ready');
+  mixStatus.innerHTML = `<i class="fa-solid fa-circle-check"></i> ${message}`;
+}
 
-  function fmt(s){
-    s = Math.max(0, Math.round(s));
-    const m = Math.floor(s/60), ss = s % 60;
-    return m > 0 ? `${m}:${String(ss).padStart(2,'0')}` : `${ss}s`;
+function setStatusError(message){
+  mixStatus.classList.remove('ready');
+  mixStatus.classList.add('error');
+  mixStatus.innerHTML = `<i class="fa-solid fa-triangle-exclamation"></i> ${message}`;
+}
+
+function toSeconds(value){
+  if (value === null || value === undefined) return null;
+  const n = Number(value);
+  if (!Number.isFinite(n)) return null;
+  return n < 0 ? 0 : n;
+}
+
+const phaseState = {
+  ag: { required: agPlanSec > 0, running: false, complete: agPlanSec <= 0, everRan: false, idleSince: null },
+  air: { required: airPlanSec > 0, running: false, complete: airPlanSec <= 0, everRan: false, idleSince: null },
+};
+
+const IDLE_ASSUME_DONE_MS = 5000;
+
+let firstStatusApplied = false;
+let pollHandle = null;
+
+function updatePhase(which, planSeconds, stateStr, remainingSeconds){
+  const statusEl = which === 'ag' ? agStatus : airStatus;
+  const etaEl    = which === 'ag' ? agEta    : airEta;
+  const fillEl   = which === 'ag' ? agFill   : airFill;
+  const st       = phaseState[which];
+
+  const plan = Math.max(0, Number(planSeconds) || 0);
+  const stateUpper = (stateStr || '').toString().trim().toUpperCase();
+  const remaining = (typeof remainingSeconds === 'number' && Number.isFinite(remainingSeconds)) ? Math.max(0, remainingSeconds) : null;
+
+  st.required = plan > 0;
+  st.running = false;
+  st.complete = !st.required;
+
+  fillEl.classList.remove('done');
+
+  if (!st.required){
+    st.everRan = false;
+    st.idleSince = null;
+    statusEl.textContent = 'Not required';
+    etaEl.textContent = '—';
+    fillEl.style.width = '0%';
+    return;
   }
 
-  function startBar(which, plannedSeconds){
-    const statusEl = which === 'ag' ? agStatus : airStatus;
-    const etaEl    = which === 'ag' ? agEta    : airEta;
-    const fillEl   = which === 'ag' ? agFill   : airFill;
+  st.complete = false;
 
-    if (plannedSeconds <= 0){
-      statusEl.textContent = 'Disabled';
-      etaEl.textContent = '—';
-      fillEl.classList.add('done');
-      fillEl.style.width = '100%';
-      return { stop: ()=>{} };
-    }
+  const isRunning = (stateUpper === 'ON') || (remaining !== null && remaining > 0);
 
+  if (isRunning){
+    st.running = true;
+    st.everRan = true;
+    st.idleSince = null;
     statusEl.textContent = 'Running';
-    const startTS = performance.now()/1000;
-    let timer = setInterval(()=>{
-      const elapsed = (performance.now()/1000) - startTS;
-      const left = Math.max(0, plannedSeconds - elapsed);
-      const pct  = Math.min(100, (elapsed / plannedSeconds) * 100);
-      etaEl.textContent = fmt(left);
+    etaEl.textContent = (remaining !== null) ? fmt(remaining) : '—';
+    if (plan > 0 && remaining !== null){
+      const pct = Math.min(100, Math.max(0, ((plan - remaining) / plan) * 100));
       fillEl.style.width = pct + '%';
-      if (left <= 0){
-        clearInterval(timer);
-        statusEl.textContent = 'Done';
-        fillEl.classList.add('done');
-        fillEl.style.width = '100%';
-        maybeEnableNext();
-      }
-    }, 200);
-
-    return {
-      stop: ()=>{ try{ clearInterval(timer); }catch(e){} }
-    };
-  }
-
-  function maybeEnableNext(){
-    const allDone =
-      (agPlanSec <= 0 || agStatus.textContent === 'Done') &&
-      (airPlanSec <= 0 || airStatus.textContent === 'Done');
-    if (allDone){
-      nextBtn.style.display = '';
+    } else if (st.everRan) {
+      fillEl.style.width = '100%';
+    } else {
+      fillEl.style.width = '0%';
     }
+    return;
   }
 
-  btn.addEventListener('click', ()=>{
-    btn.classList.add('is-running');
-    btn.disabled = true;
-    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Running…';
+  if (remaining === 0){
+    st.running = false;
+    st.complete = true;
+    st.everRan = true;
+    st.idleSince = null;
+    statusEl.textContent = 'Done';
+    etaEl.textContent = '0s';
+    fillEl.classList.add('done');
+    fillEl.style.width = '100%';
+    return;
+  }
 
-    const agCtl  = startBar('ag', agPlanSec);
-    const airCtl = startBar('air', airPlanSec);
+  if (st.everRan){
+    st.complete = true;
+    st.idleSince = null;
+    statusEl.textContent = 'Done';
+    etaEl.textContent = '0s';
+    fillEl.classList.add('done');
+    fillEl.style.width = '100%';
+    return;
+  }
 
-    // Fire-and-forget the server action; UI timers run immediately from plan.
-    fetch('{{ url_for("reservoirs.api_reservoirs_mix") }}', {
+  if (st.idleSince === null){
+    st.idleSince = Date.now();
+  } else if ((Date.now() - st.idleSince) >= IDLE_ASSUME_DONE_MS){
+    st.complete = true;
+    st.everRan = true;
+    st.idleSince = null;
+    statusEl.textContent = 'Done';
+    etaEl.textContent = '0s';
+    fillEl.classList.add('done');
+    fillEl.style.width = '100%';
+    return;
+  }
+
+  statusEl.textContent = 'Idle';
+  etaEl.textContent = '—';
+  fillEl.style.width = '0%';
+}
+
+function updateFinishState(){
+  if (!firstStatusApplied){
+    finishBtn.disabled = true;
+    finishBtn.setAttribute('aria-disabled', 'true');
+    setStatusRunning('Mixing reservoir…');
+    return;
+  }
+
+  const nothingToRun = (!phaseState.ag.required && !phaseState.air.required);
+  const agDone = (!phaseState.ag.required) || phaseState.ag.complete;
+  const airDone = (!phaseState.air.required) || phaseState.air.complete;
+  const mixing = (phaseState.ag.running || phaseState.air.running);
+
+  if (agDone && airDone){
+    finishBtn.disabled = false;
+    finishBtn.removeAttribute('aria-disabled');
+    const msg = nothingToRun ? 'No premix required' : 'Premix complete';
+    setStatusComplete(msg);
+  } else {
+    finishBtn.disabled = true;
+    finishBtn.setAttribute('aria-disabled', 'true');
+    setStatusRunning(mixing ? 'Mixing reservoir…' : 'Preparing premix…');
+  }
+}
+
+function applyStatusPayload(payload){
+  if (!payload) return;
+
+  const agTotal = toSeconds(payload.agitator_time_total_s);
+  if (agTotal !== null){
+    agPlanSec = agTotal;
+    document.getElementById('agPlan').textContent = String(Math.round(agPlanSec));
+  }
+
+  const airTotal = toSeconds(payload.air_pump_time_total_s);
+  if (airTotal !== null){
+    airPlanSec = airTotal;
+    document.getElementById('airPlan').textContent = String(Math.round(airPlanSec));
+  }
+
+  updatePhase('ag', agPlanSec, payload.agitator_state, toSeconds(payload.agitator_time_remaining_s));
+  updatePhase('air', airPlanSec, payload.air_pump_state, toSeconds(payload.air_pump_time_remaining_s));
+
+  firstStatusApplied = true;
+  updateFinishState();
+}
+
+async function fetchStatus(){
+  try {
+    const res = await fetch(STATUS_URL, { cache: 'no-store', credentials: 'same-origin' });
+    if (!res.ok) throw new Error(`Status HTTP ${res.status}`);
+    const payload = await res.json();
+    applyStatusPayload(payload);
+  } catch (err) {
+    console.error('Failed to fetch system status', err);
+  }
+}
+
+function schedulePoll(){
+  pollHandle = setTimeout(async () => {
+    await fetchStatus();
+    schedulePoll();
+  }, POLL_INTERVAL_MS);
+}
+
+updateFinishState();
+fetchStatus().finally(schedulePoll);
+
+finishBtn.addEventListener('click', async () => {
+  if (finishBtn.disabled) return;
+
+  const now = new Date();
+  const clientUtc = now.toISOString();
+  const clientLocal = now.toLocaleString();
+  const original = finishBtn.innerHTML;
+
+  finishBtn.disabled = true;
+  finishBtn.setAttribute('aria-disabled', 'true');
+  finishBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Finishing…';
+  setStatusRunning('Finalising…');
+
+  try {
+    await fetch(RENEWAL_END_URL, {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({})
-    }).catch(()=>{}).finally(()=>{
-      // when request completes naturally, allow Next if both done
-      maybeEnableNext();
-      // revert the run button state (visual)
-      setTimeout(()=>{
-        btn.classList.remove('is-running');
-        btn.innerHTML = '<i class="fa-solid fa-water"></i> Mix and aerate reservoir';
-      }, 300);
+      body: '{}',
+      credentials: 'same-origin'
     });
-  });
-
-  // live clock badge (same behaviour as Step 3)
-  const liveStamp = document.getElementById('liveStamp');
-  function tickLabel(){
-    const d = new Date();
-    if (liveStamp) liveStamp.textContent = 'live • ' + d.toLocaleTimeString();
+  } catch (e) {
+    // best-effort; continue regardless
   }
-  setInterval(tickLabel, 1000); tickLabel();
+
+  let payload = null;
+  try {
+    const res = await fetch(COMPLETE_URL, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      credentials: 'same-origin',
+      body: JSON.stringify({
+        profile_name: PROFILE_NAME || null,
+        completed_at_client: clientUtc
+      })
+    });
+
+    const raw = await res.text();
+    payload = raw ? JSON.parse(raw) : {};
+
+    if (!res.ok || payload?.ok !== true) {
+      throw new Error(payload?.error || 'Request failed');
+    }
+  } catch (err) {
+    console.error(err);
+    setStatusError('Could not finalise the renewal. Please try again.');
+    finishBtn.disabled = false;
+    finishBtn.removeAttribute('aria-disabled');
+    finishBtn.innerHTML = original;
+    alert('Could not finish the renewal. Please try again.');
+    return;
+  }
+
+  const redirectUrl = new URL(REDIRECT_URL, window.location.origin);
+  redirectUrl.searchParams.set('message', 'renewal_complete');
+
+  const completedLocal = payload?.completed_at_local || clientLocal;
+  const completedUtc = payload?.completed_at_utc || clientUtc;
+
+  if (completedLocal) redirectUrl.searchParams.set('completed_local', completedLocal);
+  if (completedUtc) redirectUrl.searchParams.set('completed', completedUtc);
+  if (PROFILE_NAME) redirectUrl.searchParams.set('profile', PROFILE_NAME);
+
+  window.location.assign(redirectUrl.toString());
+});
+
+// live clock badge (same behaviour as Step 3)
+const liveStamp = document.getElementById('liveStamp');
+function tickLabel(){
+  const d = new Date();
+  if (liveStamp) liveStamp.textContent = 'live • ' + d.toLocaleTimeString();
+}
+setInterval(tickLabel, 1000); tickLabel();
+
 </script>
 </body>
 </html>

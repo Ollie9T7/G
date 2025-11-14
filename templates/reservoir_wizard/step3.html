@@ -158,7 +158,7 @@
   {% include "header2.html" %}
   <div class="wrap">
     <div class="stepper-wide" aria-label="Wizard steps">
-  {% set total = 5 %}
+  {% set total = 4 %}
   {% for i in range(1, total + 1) %}
     {% set is_active = (i == step) %}
     {% set is_done = (i < step) %}
@@ -175,7 +175,7 @@
     <div class="stepbar">
       <div>
         <h1 style="margin:0 0 6px 0; font-size:22px;">Reservoir renewal</h1>
-<div class="muted" style="font-size:13px;">Step {{ step }} of 5 — Choose a recipe and dose nutrients.</div>
+<div class="muted" style="font-size:13px;">Step {{ step }} of 4 — Choose a recipe and dose nutrients.</div>
       </div>
       <span class="pill" id="liveStamp">live</span>
     </div>
@@ -746,8 +746,8 @@
     paintNeeded(NUTS_INIT, liveLitres);
   }
   
-  // Resume the profile via local endpoint, then advance to the next step
-  async function goNextUnpauseThenStep5() {
+  // Resume the profile via local endpoint, then advance to the final mixing step
+  async function goNextUnpauseThenStep4() {
     const btn = document.getElementById('nextBtn');
     const prev = btn.innerHTML;
     btn.disabled = true;
@@ -787,7 +787,7 @@
 
   document.getElementById('nextBtn')?.addEventListener('click', (e) => {
     e.preventDefault();
-    goNextUnpauseThenStep5();
+    goNextUnpauseThenStep4();
   });
 </script>
 

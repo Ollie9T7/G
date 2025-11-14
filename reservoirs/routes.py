@@ -124,7 +124,7 @@ def _load_nutrients_for_selected(ctx_local: dict, sel_fn: str):
 @reservoirs_bp.route("/reservoirs/wizard", methods=["GET", "POST"])
 def reservoir_wizard():
     step = int(request.args.get("step", "1") or 1)
-    if step < 1 or step > 6:
+    if step < 1 or step > 4:
         return redirect(url_for("reservoirs.reservoir_wizard", step=1))
         
 
@@ -167,13 +167,13 @@ def reservoir_wizard():
                 )
 
             if action == "next":
-                # dosing now happens on Step 3, so skip old Step 4
-                return redirect(url_for("reservoirs.reservoir_wizard", step=5))
+                # dosing now happens on Step 3, so continue to the premix summary
+                return redirect(url_for("reservoirs.reservoir_wizard", step=4))
 
         if action == "back":
             return redirect(url_for("reservoirs.reservoir_wizard", step=max(1, step - 1)))
         if action == "next":
-            return redirect(url_for("reservoirs.reservoir_wizard", step=min(6, step + 1)))
+            return redirect(url_for("reservoirs.reservoir_wizard", step=min(4, step + 1)))
 
     # Build context
     ctx = _CTX()
@@ -883,39 +883,46 @@ def api_reservoirs_complete():
     logger = ctx["LOGGER"]
 
     body = request.get_json(silent=True) or {}
-    profile_name = body.get("profile_name")
+    profile_name = (body.get("profile_name") or "").strip() or None
+    client_stamp = body.get("completed_at_client")
+
+    now_utc = datetime.now(timezone.utc)
+    iso_utc = now_utc.strftime("%Y-%m-%dT%H:%M:%S.%fZ")
+    iso_local = now_utc.astimezone().isoformat()
 
     try:
-        sd["reservoir_last_fill_iso"] = datetime.now(timezone.utc).isoformat()
+        sd["reservoir_last_fill_iso"] = iso_utc
     except Exception:
         sd["reservoir_last_fill_iso"] = None
-        
+
+    payload = {
+        "profile_used": profile_name,
+        "completed_at_utc": iso_utc,
+        "completed_at_local": iso_local,
+    }
+    if client_stamp:
+        payload["completed_at_client"] = client_stamp
 
     try:
         pid = _active_profile_id()
         logger.log_event(
             "reservoir_renewal",
-            "Reservoir renewed",
-            reason_code="end",
+            "Reservoir renewal complete",
+            reason_code="complete",
             profile_id=pid,
-            payload={"profile_used": profile_name}
+            payload=payload,
+            ts_utc=iso_utc,
+            ts_local=iso_local,
         )
     except Exception:
         pass
 
-
-
-
-    return jsonify({"ok": True, "last_fill": sd.get("reservoir_last_fill_iso")})
-
-
-
-
-
-
-#
-# ───────────────────────────── Calibration APIs ────────────────────────────
-#
+    return jsonify({
+        "ok": True,
+        "last_fill": sd.get("reservoir_last_fill_iso"),
+        "completed_at_utc": iso_utc,
+        "completed_at_local": iso_local,
+    })
 
 @reservoirs_bp.route("/api/nutrient/prime", methods=["POST"])
 def api_nutrient_prime():
