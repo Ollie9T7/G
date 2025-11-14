@@ -1,5 +1,6 @@
 #web/systems_routes.py
 from flask import Blueprint, render_template, jsonify, make_response, current_app
+from time import monotonic as _mono
 # NEW: capacity helper to compute "water used"
 from global_settings import usable_capacity_kg
 
@@ -45,6 +46,9 @@ def status_json():
         "pump_time_total_s":          sd.get("pump_time_total_s"),
         "agitator_time_total_s":      sd.get("agitator_time_total_s"),
         "air_pump_time_total_s":      sd.get("air_pump_time_total_s"),
+        "pump_phase_end_ts":          sd.get("pump_phase_end_ts"),
+        "agitator_phase_end_ts":      sd.get("agitator_phase_end_ts"),
+        "air_pump_phase_end_ts":      sd.get("air_pump_phase_end_ts"),
 
         "temperature_c":        sd.get("temperature_c"),
         "temperature_top":      sd.get("temperature_top"),
@@ -102,6 +106,8 @@ def status_json():
         payload["banner"] = compute_banner(payload)
     except Exception:
         payload["banner"] = {"level": "info", "message": "System nominal", "rotate": []}
+
+    payload["status_mono_now"] = _mono()
 
     resp = make_response(jsonify(payload))
     resp.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'

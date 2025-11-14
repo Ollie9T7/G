@@ -695,6 +695,11 @@ def simulate_profile(profile_name: str, profile_data: dict):
             end_by_run = air_timer + air_run
             end_by_pump = now_mono + clamp
             status_data["air_pump_phase_end_ts"] = min(end_by_run, end_by_pump)
+            try:
+                duration = max(0.0, float(status_data["air_pump_phase_end_ts"]) - float(air_timer))
+                status_data["air_pump_time_total_s"] = int(math.ceil(duration)) if duration > 0 else int(air_run)
+            except Exception:
+                status_data["air_pump_time_total_s"] = int(air_run) if air_run else None
             status_data["air_pump_time_remaining_s"] = int(
                 math.ceil(max(0.0, status_data["air_pump_phase_end_ts"] - now_mono))
             )
@@ -710,6 +715,11 @@ def simulate_profile(profile_name: str, profile_data: dict):
             end_by_run = agitator_timer + ag_run
             end_by_pump = now_mono + clamp
             status_data["agitator_phase_end_ts"] = min(end_by_run, end_by_pump)
+            try:
+                duration = max(0.0, float(status_data["agitator_phase_end_ts"]) - float(agitator_timer))
+                status_data["agitator_time_total_s"] = int(math.ceil(duration)) if duration > 0 else int(ag_run)
+            except Exception:
+                status_data["agitator_time_total_s"] = int(ag_run) if ag_run else None
             status_data["agitator_time_remaining_s"] = int(
                 math.ceil(max(0.0, status_data["agitator_phase_end_ts"] - now_mono))
             )
@@ -1446,6 +1456,11 @@ def simulate_profile(profile_name: str, profile_data: dict):
                         end_by_run  = air_timer + air_run
                         end_by_pump = now_m + max(0.0, float(next_on_due_at - now))
                         status_data["air_pump_phase_end_ts"] = min(end_by_run, end_by_pump)
+                        try:
+                            duration = max(0.0, float(status_data["air_pump_phase_end_ts"]) - float(air_timer))
+                            status_data["air_pump_time_total_s"] = int(math.ceil(duration)) if duration > 0 else int(air_run)
+                        except Exception:
+                            status_data["air_pump_time_total_s"] = int(air_run) if air_run else None
                     ap_end = status_data.get("air_pump_phase_end_ts")
                     if status_data.get("air_pump_state") == "ON" and ap_end and now_m >= float(ap_end):
                         _set_air_pump(False); status_data["air_pump_state"] = "OFF"
@@ -1460,6 +1475,11 @@ def simulate_profile(profile_name: str, profile_data: dict):
                         end_by_run  = agitator_timer + ag_run
                         end_by_pump = now_m + max(0.0, float(next_on_due_at - now))
                         status_data["agitator_phase_end_ts"] = min(end_by_run, end_by_pump)
+                        try:
+                            duration = max(0.0, float(status_data["agitator_phase_end_ts"]) - float(agitator_timer))
+                            status_data["agitator_time_total_s"] = int(math.ceil(duration)) if duration > 0 else int(ag_run)
+                        except Exception:
+                            status_data["agitator_time_total_s"] = int(ag_run) if ag_run else None
                     a_end = status_data.get("agitator_phase_end_ts")
                     if status_data.get("agitator_state") == "ON" and a_end and now_m >= float(a_end):
                         _set_agitator(False); status_data["agitator_state"] = "OFF"

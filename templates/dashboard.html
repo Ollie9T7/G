@@ -546,6 +546,52 @@
     return (h>0? h+':' : '') + (h>0? String(m).padStart(2,'0'): m) + ':' + String(r).padStart(2,'0');
   }
 
+  const toFiniteNumber = (value) => {
+    if (value === null || value === undefined) return null;
+    const n = Number(value);
+    return Number.isFinite(n) ? n : null;
+  };
+
+  function deriveRemainingSeconds(remRaw, phaseEndRaw, monoNowRaw){
+    const direct = toFiniteNumber(remRaw);
+    if (direct !== null) return direct < 0 ? 0 : direct;
+
+    const phaseEnd = toFiniteNumber(phaseEndRaw);
+    const monoNow  = toFiniteNumber(monoNowRaw);
+    if (phaseEnd === null || monoNow === null) return null;
+
+    const diff = phaseEnd - monoNow;
+    if (!Number.isFinite(diff)) return null;
+    return diff > 0 ? diff : 0;
+  }
+
+  function primeTimedBar(barEl, planSeconds, remainingSeconds){
+    if (!barEl) return;
+    const plan = Math.max(0, Number(planSeconds) || 0);
+    const remaining = (typeof remainingSeconds === 'number' && Number.isFinite(remainingSeconds))
+      ? Math.max(0, Math.min(plan, remainingSeconds))
+      : null;
+
+    if (plan <= 0){
+      barEl.style.transition = 'none';
+      barEl.style.width = '0%';
+      return;
+    }
+
+    const elapsed = (remaining !== null) ? Math.max(0, plan - remaining) : 0;
+    const pct = Math.min(100, Math.max(0, (elapsed / plan) * 100));
+
+    barEl.style.transition = 'none';
+    barEl.style.width = `${pct}%`;
+
+    if (remaining !== null){
+      requestAnimationFrame(() => {
+        barEl.style.transition = `width ${remaining}s linear`;
+        barEl.style.width = '100%';
+      });
+    }
+  }
+
   // --- Cards/sensors ---
   function nullifyCard(card, badge, valueSetter){
     card.classList.add('null'); badge.classList.add('null');
@@ -848,11 +894,11 @@ function updateSensors(d){
   // --- Live System Status (timed devices) ---
   const DEVICES = [
     {key:'pump',     label:'Water pump',
-      state:'pump_state', rem:'pump_time_remaining_s', total:'pump_time_total_s', count:'cycle_count'},
+      state:'pump_state', rem:'pump_time_remaining_s', total:'pump_time_total_s', phase:'pump_phase_end_ts', count:'cycle_count'},
     {key:'agitator', label:'Agitator',
-      state:'agitator_state', rem:'agitator_time_remaining_s', total:'agitator_time_total_s', count:'agitator_cycle_count'},
+      state:'agitator_state', rem:'agitator_time_remaining_s', total:'agitator_time_total_s', phase:'agitator_phase_end_ts', count:'agitator_cycle_count'},
     {key:'air',      label:'Air pump',
-      state:'air_pump_state', rem:'air_pump_time_remaining_s', total:'air_pump_time_total_s', count:'air_pump_cycle_count'},
+      state:'air_pump_state', rem:'air_pump_time_remaining_s', total:'air_pump_time_total_s', phase:'air_pump_phase_end_ts', count:'air_pump_cycle_count'},
   ];
 
   // --- Live System Status (reactive devices — pill + since + cycles; no progress) ---
@@ -881,7 +927,7 @@ function updateSensors(d){
         elapsed:  $(`lss-elapsed-${d.key}`),
         remain:   $(`lss-remaining-${d.key}`)
       };
-      S[d.key] = { on:false, total:0, seedElapsed:0, startedPerf:0, localCount:0, lastServerOn:false };
+      S[d.key] = { on:false, total:0, seedElapsed:0, startedPerf:0, localCount:0, lastServerOn:false, lastRem:null, animPrimed:false };
     });
 
     // Reactive devices (pill + since + cycles) — includes hasInit guard
@@ -925,13 +971,13 @@ function updateSensors(d){
         const elapsed = st.seedElapsed + (now - st.startedPerf)/1000;
         const clamped = Math.min(st.total, Math.max(0, elapsed));
         const remain  = Math.max(0, st.total - clamped);
-        const pct = st.total > 0 ? Math.round((clamped / st.total) * 100) : 100;
-
-        el.bar && (el.bar.style.width = `${pct}%`);
         el.elapsed && (el.elapsed.textContent = fmt(Math.round(clamped)));
         el.remain  && (el.remain.textContent  = fmt(Math.ceil(remain)));
 
-        if (remain <= 0) st.on = false;
+        if (remain <= 0){
+          st.on = false;
+          st.animPrimed = false;
+        }
       });
 
       // Keep "since" timers fresh for reactive devices
@@ -992,13 +1038,15 @@ function updateSensors(d){
     handleProfileChange(d);
 
     // Timed devices
+    const monoNow = toFiniteNumber(d?.status_mono_now);
+
     DEVICES.forEach(dev => {
       const el = E[dev.key]; if (!el) return;
 
       const stateRaw = String(d?.[dev.state] || 'OFF').toUpperCase();
       const serverOn = (stateRaw === 'ON');
       const totalS   = Number(d?.[dev.total]);
-      const remS     = Number(d?.[dev.rem]);
+      const remS     = deriveRemainingSeconds(d?.[dev.rem], dev.phase ? d?.[dev.phase] : null, monoNow);
 
       // Pill
       setPill(dev.key, serverOn);
@@ -1016,24 +1064,40 @@ function updateSensors(d){
 
       // Progress
       if (serverOn && Number.isFinite(totalS) && totalS > 0) {
-        if (!S[dev.key].on || S[dev.key].total !== totalS) {
+        const remClamped = (Number.isFinite(remS) && remS >= 0) ? Math.min(totalS, remS) : null;
+        const primeNeeded = !S[dev.key].animPrimed || S[dev.key].total !== totalS || (Number.isFinite(remClamped) && (S[dev.key].lastRem === null || remClamped > S[dev.key].lastRem + 0.25));
+
+        if (!S[dev.key].on){
           S[dev.key].on = true;
-          S[dev.key].total = totalS;
-          if (Number.isFinite(remS) && remS >= 0 && remS <= totalS) {
-            S[dev.key].seedElapsed = Math.max(0, totalS - remS);
-          } else {
-            S[dev.key].seedElapsed = 0;
-          }
-          S[dev.key].startedPerf = performance.now();
           el.track && (el.track.style.display  = '');
           el.timesBox && (el.timesBox.style.display = '');
           startAnim();
         }
+
+        if (primeNeeded){
+          S[dev.key].total = totalS;
+          if (Number.isFinite(remClamped)) {
+            S[dev.key].seedElapsed = Math.max(0, totalS - remClamped);
+          } else {
+            S[dev.key].seedElapsed = 0;
+          }
+          S[dev.key].startedPerf = performance.now();
+          primeTimedBar(el.bar, totalS, remClamped);
+          S[dev.key].animPrimed = true;
+          startAnim();
+        }
+
+        S[dev.key].lastRem = Number.isFinite(remClamped) ? remClamped : null;
       } else {
         S[dev.key].on = false;
+        S[dev.key].animPrimed = false;
+        S[dev.key].lastRem = null;
         if (el.track)   el.track.style.display = 'none';
         if (el.timesBox)el.timesBox.style.display = 'none';
-        if (el.bar)     el.bar.style.width = '0%';
+        if (el.bar){
+          el.bar.style.transition = 'none';
+          el.bar.style.width = '0%';
+        }
       }
     });
 
