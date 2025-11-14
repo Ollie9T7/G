@@ -294,6 +294,7 @@ const phaseState = {
     plan: agPlanSec,
     lastRemaining: null,
     animPrimed: false,
+    lastFillPct: null,
   },
   air: {
     required: airPlanSec > 0,
@@ -305,6 +306,7 @@ const phaseState = {
     plan: airPlanSec,
     lastRemaining: null,
     animPrimed: false,
+    lastFillPct: null,
   },
 };
 
@@ -325,6 +327,7 @@ function resetFill(fillEl){
 }
 
 function primeFill(fillEl, planSeconds, remainingSeconds){
+  if (!fillEl) return 0;
   const plan = Math.max(0, Number(planSeconds) || 0);
   const remaining = (typeof remainingSeconds === 'number' && Number.isFinite(remainingSeconds))
     ? Math.max(0, Math.min(plan, remainingSeconds))
@@ -332,7 +335,7 @@ function primeFill(fillEl, planSeconds, remainingSeconds){
 
   if (plan <= 0){
     resetFill(fillEl);
-    return;
+    return 0;
   }
 
   const elapsed = (remaining !== null) ? Math.max(0, plan - remaining) : 0;
@@ -342,15 +345,10 @@ function primeFill(fillEl, planSeconds, remainingSeconds){
   fillEl.style.transition = 'none';
   fillEl.style.width = pct + '%';
 
-  if (remaining !== null){
-    requestAnimationFrame(() => {
-      fillEl.style.transition = `width ${remaining}s linear`;
-      fillEl.style.width = '100%';
-    });
-  }
+  return pct;
 }
 
-function startPhaseTimer(st, planSeconds, etaEl){
+function startPhaseTimer(st, planSeconds, etaEl, fillEl){
   clearPhaseTimer(st);
   const plan = Math.max(0, Number(planSeconds) || 0);
   if (!(plan > 0) || !st.startedPerf){
@@ -359,10 +357,27 @@ function startPhaseTimer(st, planSeconds, etaEl){
   }
 
   const tick = () => {
-    const elapsed = (performance.now()/1000) - st.startedPerf;
-    const left = Math.max(0, plan - elapsed);
+    const elapsed = Math.max(0, (performance.now()/1000) - st.startedPerf);
+    const leftRaw = plan - elapsed;
+    const left = Math.max(0, leftRaw);
     etaEl.textContent = left > 0 ? fmt(left) : '0s';
-    if (left <= 0){
+
+    if (fillEl && plan > 0){
+      const bounded = Math.min(plan, elapsed);
+      let pct = Math.min(100, (bounded / plan) * 100);
+      if (st.running && left <= 0.1) {
+        pct = Math.min(pct, 99.9);
+      } else if (left > 0.1) {
+        pct = Math.min(pct, 99.5);
+      }
+      if (st.lastFillPct === null || Math.abs(pct - st.lastFillPct) >= 0.2) {
+        fillEl.style.transition = 'width 0.2s linear';
+        fillEl.style.width = pct + '%';
+        st.lastFillPct = pct;
+      }
+    }
+
+    if (left <= 0 && !st.running){
       clearPhaseTimer(st);
     }
   };
@@ -378,6 +393,7 @@ function completePhase(st, statusEl, etaEl, fillEl){
   st.startedPerf = null;
   st.lastRemaining = 0;
   st.animPrimed = false;
+  st.lastFillPct = 100;
   clearPhaseTimer(st);
 
   statusEl.textContent = 'Done';
@@ -410,6 +426,7 @@ function updatePhase(which, planSeconds, stateStr, remainingSeconds){
     st.startedPerf = null;
     st.lastRemaining = null;
     st.animPrimed = false;
+    st.lastFillPct = 0;
     clearPhaseTimer(st);
     statusEl.textContent = 'Not required';
     etaEl.textContent = '—';
@@ -418,6 +435,14 @@ function updatePhase(which, planSeconds, stateStr, remainingSeconds){
   }
 
   const isRunning = stateUpper === 'ON';
+
+  if (isRunning && remaining !== null && st.lastRemaining !== null && remaining > st.lastRemaining) {
+    const nearRestart = remaining >= Math.max(plan - 0.35, plan * 0.75);
+    const wasAtZero  = st.lastRemaining <= 0.35;
+    if (!(nearRestart && wasAtZero)) {
+      remaining = st.lastRemaining;
+    }
+  }
 
   if (isRunning){
     st.running = true;
@@ -434,13 +459,16 @@ function updatePhase(which, planSeconds, stateStr, remainingSeconds){
 
     const shouldPrime = !st.animPrimed || plan !== prevPlan || (remaining !== null && (st.lastRemaining === null || remaining > st.lastRemaining + 0.25));
     if (shouldPrime){
-      primeFill(fillEl, plan, remaining);
+      const primed = primeFill(fillEl, plan, remaining);
+      if (Number.isFinite(primed)) {
+        st.lastFillPct = primed;
+      }
       st.animPrimed = true;
     }
 
     st.lastRemaining = remaining;
     if (remaining !== null){
-      startPhaseTimer(st, plan, etaEl);
+      startPhaseTimer(st, plan, etaEl, fillEl);
     } else {
       clearPhaseTimer(st);
     }
@@ -458,6 +486,7 @@ function updatePhase(which, planSeconds, stateStr, remainingSeconds){
     st.animPrimed = false;
     st.startedPerf = null;
     st.lastRemaining = remaining;
+    st.lastFillPct = 0;
     statusEl.textContent = 'Idle';
     etaEl.textContent = '—';
     resetFill(fillEl);

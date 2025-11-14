@@ -483,6 +483,7 @@
 /* ===== GrowStuff Dashboard JS — Timed devices + reactive devices (persistent cycles; no banner progress; no +1 on refresh) ===== */
 (() => {
   const POLL_MS = 500;
+  const REM_JITTER_EPS = 0.35;
 
 // In-flight guard + self-scheduling timer (prevents overlapping fetches)
   let inFlight = false;
@@ -566,7 +567,7 @@
   }
 
   function primeTimedBar(barEl, planSeconds, remainingSeconds){
-    if (!barEl) return;
+    if (!barEl) return null;
     const plan = Math.max(0, Number(planSeconds) || 0);
     const remaining = (typeof remainingSeconds === 'number' && Number.isFinite(remainingSeconds))
       ? Math.max(0, Math.min(plan, remainingSeconds))
@@ -575,7 +576,7 @@
     if (plan <= 0){
       barEl.style.transition = 'none';
       barEl.style.width = '0%';
-      return;
+      return 0;
     }
 
     const elapsed = (remaining !== null) ? Math.max(0, plan - remaining) : 0;
@@ -584,12 +585,7 @@
     barEl.style.transition = 'none';
     barEl.style.width = `${pct}%`;
 
-    if (remaining !== null){
-      requestAnimationFrame(() => {
-        barEl.style.transition = `width ${remaining}s linear`;
-        barEl.style.width = '100%';
-      });
-    }
+    return pct;
   }
 
   // --- Cards/sensors ---
@@ -927,7 +923,17 @@ function updateSensors(d){
         elapsed:  $(`lss-elapsed-${d.key}`),
         remain:   $(`lss-remaining-${d.key}`)
       };
-      S[d.key] = { on:false, total:0, seedElapsed:0, startedPerf:0, localCount:0, lastServerOn:false, lastRem:null, animPrimed:false };
+      S[d.key] = {
+        on:false,
+        total:0,
+        seedElapsed:0,
+        startedPerf:0,
+        localCount:0,
+        lastServerOn:false,
+        lastRem:null,
+        animPrimed:false,
+        lastBarPct:null
+      };
     });
 
     // Reactive devices (pill + since + cycles) — includes hasInit guard
@@ -969,14 +975,26 @@ function updateSensors(d){
         const st = S[d.key]; const el = E[d.key]; if (!st.on || !el) return; any = true;
 
         const elapsed = st.seedElapsed + (now - st.startedPerf)/1000;
-        const clamped = Math.min(st.total, Math.max(0, elapsed));
-        const remain  = Math.max(0, st.total - clamped);
-        el.elapsed && (el.elapsed.textContent = fmt(Math.round(clamped)));
+        if (st.total > 0 && elapsed > st.total + 0.5) {
+          st.total = elapsed;
+        }
+        const clamped = Math.max(0, elapsed);
+        const totalForPct = st.total > 0 ? st.total : clamped;
+        const remain  = Math.max(0, totalForPct - clamped);
+        el.elapsed && (el.elapsed.textContent = fmt(Math.round(Math.min(clamped, totalForPct))));
         el.remain  && (el.remain.textContent  = fmt(Math.ceil(remain)));
 
-        if (remain <= 0){
-          st.on = false;
-          st.animPrimed = false;
+        if (el.bar && totalForPct > 0) {
+          let pct = Math.min(100, (clamped / totalForPct) * 100);
+          if (remain > 0.1) {
+            pct = Math.min(pct, 99.5);
+          }
+          const prev = S[d.key].lastBarPct;
+          if (prev === null || Math.abs(pct - prev) >= 0.1) {
+            el.bar.style.transition = 'width 0.2s linear';
+            el.bar.style.width = `${pct}%`;
+            S[d.key].lastBarPct = pct;
+          }
         }
       });
 
@@ -1064,11 +1082,21 @@ function updateSensors(d){
 
       // Progress
       if (serverOn && Number.isFinite(totalS) && totalS > 0) {
-        const remClamped = (Number.isFinite(remS) && remS >= 0) ? Math.min(totalS, remS) : null;
+        let remClamped = (Number.isFinite(remS) && remS >= 0) ? Math.min(totalS, remS) : null;
+        const prevRem = S[dev.key].lastRem;
+        if (remClamped !== null && prevRem !== null && remClamped > prevRem) {
+          const nearRestart = remClamped >= Math.max(totalS - REM_JITTER_EPS, totalS * 0.75);
+          const wasAtZero  = prevRem <= REM_JITTER_EPS;
+          if (!(nearRestart && wasAtZero)) {
+            remClamped = prevRem;
+          }
+        }
+
         const primeNeeded = !S[dev.key].animPrimed || S[dev.key].total !== totalS || (Number.isFinite(remClamped) && (S[dev.key].lastRem === null || remClamped > S[dev.key].lastRem + 0.25));
 
         if (!S[dev.key].on){
           S[dev.key].on = true;
+          S[dev.key].lastBarPct = null;
           el.track && (el.track.style.display  = '');
           el.timesBox && (el.timesBox.style.display = '');
           startAnim();
@@ -1082,7 +1110,10 @@ function updateSensors(d){
             S[dev.key].seedElapsed = 0;
           }
           S[dev.key].startedPerf = performance.now();
-          primeTimedBar(el.bar, totalS, remClamped);
+          const primedPct = primeTimedBar(el.bar, totalS, remClamped);
+          if (Number.isFinite(primedPct)) {
+            S[dev.key].lastBarPct = primedPct;
+          }
           S[dev.key].animPrimed = true;
           startAnim();
         }
@@ -1092,6 +1123,7 @@ function updateSensors(d){
         S[dev.key].on = false;
         S[dev.key].animPrimed = false;
         S[dev.key].lastRem = null;
+        S[dev.key].lastBarPct = null;
         if (el.track)   el.track.style.display = 'none';
         if (el.timesBox)el.timesBox.style.display = 'none';
         if (el.bar){
