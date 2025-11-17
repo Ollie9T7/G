@@ -18,6 +18,7 @@ from flask import current_app
 DOSE_CANCEL = threading.Event()
 DOSE_GEN = 0                        # monotonically increasing generation id
 DOSE_GEN_LOCK = threading.Lock()    # guard updates to DOSE_GEN
+MIX_CANCEL = threading.Event()      # cancel flag for concentrate mix
 
 def current_gen() -> int:
     return DOSE_GEN
@@ -139,18 +140,37 @@ def run_agitator(seconds: float) -> None:
         _set_agitator(False)
 
 
-def run_concentrate_mix(seconds: float) -> None:
+def run_concentrate_mix(seconds: float) -> bool:
     """Exact-duration run for the concentrate mix relay (GPIO pin 7)."""
     t_end = _mono() + max(0.0, float(seconds))
+    cancelled = False
+
+    MIX_CANCEL.clear()
     _set_concentrate_mix(True)
     try:
         while True:
+            if MIX_CANCEL.is_set():
+                cancelled = True
+                break
+
             remaining = t_end - _mono()
             if remaining <= 0:
                 break
             time.sleep(remaining if remaining < 0.02 else 0.02)
     finally:
         _set_concentrate_mix(False)
+        MIX_CANCEL.clear()
+
+    return not cancelled
+
+
+def cancel_concentrate_mix() -> None:
+    """Immediately stop the concentrate mixer."""
+    MIX_CANCEL.set()
+    try:
+        _set_concentrate_mix(False)
+    except Exception:
+        pass
 
 # ── Precise, no-overlap dosing helpers ─────────────────────────────────────
 
@@ -312,8 +332,8 @@ def run_agitator_seconds(seconds: float) -> None:
     run_agitator(seconds)
 
 
-def run_concentrate_mix_seconds(seconds: float) -> None:
+def run_concentrate_mix_seconds(seconds: float) -> bool:
     """Wrapper so routes.py can trigger the concentrate mix relay."""
-    run_concentrate_mix(seconds)
+    return run_concentrate_mix(seconds)
 
 

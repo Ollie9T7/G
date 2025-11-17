@@ -248,8 +248,9 @@
       <div class="row" style="margin-top:6px; align-items:flex-start;">
         <label for="mixSeconds">Mix duration (seconds)</label>
         <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
-          <input type="number" id="mixSeconds" name="mix_seconds" min="1" step="1" value="{{ mix_seconds or 60 }}">
+          <input type="number" id="mixSeconds" name="mix_seconds" min="1" step="1" placeholder="Enter seconds" value="{{ mix_seconds if mix_seconds is not none else '' }}">
           <button id="mixBtn" class="btn btn-blue" type="button"><i class="fa-solid fa-rotate"></i> Mix</button>
+          <button id="mixStopBtn" class="btn btn-red" type="button" style="display:none;"><i class="fa-solid fa-stop"></i> Stop</button>
           <span class="pill" id="mixState">Awaiting mix</span>
         </div>
       </div>
@@ -334,7 +335,7 @@
   const LOCKED_NAME   = {{ (selected_profile_name or '') | tojson }};
   const NUTS_INIT     = {{ (nutrients or {}) | tojson }};
   const MIX_DONE_INIT = {{ (concentrate_mixed or False) | tojson }};
-  const MIX_SECONDS_INIT = {{ (mix_seconds or 60) | tojson }};
+  const MIX_SECONDS_INIT = {{ (mix_seconds if mix_seconds is not none else 'null') | tojson }};
 </script>
 
 
@@ -353,6 +354,7 @@
   const nextBtn = $('#nextBtn');
   const stopBtn = $('#stopBtn'); /* NEW */
   const mixBtn = $('#mixBtn');
+  const mixStopBtn = $('#mixStopBtn');
   const mixSecondsInput = $('#mixSeconds');
   const mixState = $('#mixState');
   const mixCard = $('#mixCard');
@@ -433,15 +435,25 @@
 
   const serverLocked = !!LOCKED_PROF && Object.keys(NUTS_INIT || {}).length > 0;
   let mixDone = !!MIX_DONE_INIT;
-  let mixSeconds = Number.isFinite(Number(MIX_SECONDS_INIT)) ? Number(MIX_SECONDS_INIT) : 60;
+  let mixSeconds = Number.isFinite(Number(MIX_SECONDS_INIT)) ? Number(MIX_SECONDS_INIT) : null;
   let mixActive = false;
   let mixTimer = null;
+  let mixResolve = null;
+  let mixCancelled = false;
   let mixStartTS = null;
-  if (mixSecondsInput){ mixSecondsInput.value = mixSeconds; }
+  let mixAbortController = null;
+  if (mixSecondsInput && mixSeconds !== null){ mixSecondsInput.value = mixSeconds; }
+
+  function toggleMixStop(show){
+    if(!mixStopBtn) return;
+    mixStopBtn.style.display = show ? '' : 'none';
+    mixStopBtn.disabled = !show;
+  }
 
   function resetMixProgress(){
     if (mixTimer) clearInterval(mixTimer);
     mixTimer = null;
+    mixCancelled = false;
     mixStartTS = null;
 
     if (mixFill){
@@ -498,7 +510,12 @@
 
   function runMixAnimation(duration){
     return new Promise(resolve => {
+      if (mixResolve){
+        mixResolve();
+        mixResolve = null;
+      }
       resetMixProgress();
+      mixResolve = resolve;
 
       if (!duration || duration <= 0){
         mixActive = false;
@@ -530,29 +547,62 @@
         });
       }
 
-      const finish = () => {
+      const finish = (completed=true) => {
         if (mixTimer) clearInterval(mixTimer);
         mixTimer = null;
         mixActive = false;
-        mixDone = true;
-        paintMixComplete();
+        mixDone = !!completed;
+        if (completed){
+          paintMixComplete();
+        } else {
+          resetMixProgress();
+        }
         refreshMixState();
         refreshDoseAccess();
         resolve();
+        mixResolve = null;
       };
 
       mixTimer = setInterval(()=>{
         const elapsed = (performance.now()/1000) - mixStartTS;
         const left = Math.max(0, duration - elapsed);
         if (mixEta) mixEta.textContent = fmtCountdown(left);
-        if (left <= 0){ finish(); }
+        if (mixCancelled){ finish(false); }
+        else if (left <= 0){ finish(true); }
       }, 200);
     });
   }
 
+  function cancelMixAnimation(message){
+    mixCancelled = true;
+    if (mixTimer) clearInterval(mixTimer);
+    mixTimer = null;
+    mixActive = false;
+    mixDone = false;
+
+    if (mixFill){
+      mixFill.style.transition = 'none';
+      mixFill.style.width = '0%';
+      mixFill.style.background = '';
+    }
+    if (mixEta) mixEta.textContent = '—';
+    if (mixPlanned) mixPlanned.textContent = '—';
+    if (mixStatus){
+      mixStatus.textContent = message || 'Stopped';
+      mixStatus.classList.remove('is-done');
+    }
+
+    refreshMixState();
+    refreshDoseAccess();
+    mixResolve?.();
+    mixResolve = null;
+    toggleMixStop(false);
+  }
+
   async function runMixCycle(){
     const prevLabel = mixBtn?.innerHTML;
-    let secs = Number(mixSecondsInput?.value || mixSeconds || 60);
+    const raw = (mixSecondsInput?.value || '').trim();
+    let secs = Number(raw || mixSeconds);
 
     if (!Number.isFinite(secs) || secs <= 0){
       alert('Please enter a positive number of seconds to mix.');
@@ -565,17 +615,25 @@
     refreshMixState();
     refreshDoseAccess();
 
+    mixAbortController = new AbortController();
+    let animationPromise = null;
+
     try{
       if(mixBtn){
         mixBtn.disabled = true;
         mixBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Mixing…';
       }
       if(mixSecondsInput) mixSecondsInput.disabled = true;
+      toggleMixStop(true);
+
+      mixCancelled = false;
+      animationPromise = runMixAnimation(secs);
 
       const res = await fetch('/api/reservoirs/mix-concentrate', {
         method:'POST',
         headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({ seconds: secs })
+        body: JSON.stringify({ seconds: secs }),
+        signal: mixAbortController.signal,
       });
 
       let out = null;
@@ -589,17 +647,17 @@
       }
 
       mixSeconds = Number.isFinite(Number(out.seconds)) ? Number(out.seconds) : secs;
-      if (mixSecondsInput) mixSecondsInput.value = mixSeconds;
+      if (mixSecondsInput && mixSeconds !== null) mixSecondsInput.value = mixSeconds;
 
-      await runMixAnimation(mixSeconds);
+      if (animationPromise) await animationPromise;
     }catch(err){
-      alert(err?.message || 'Mix failed. Please try again.');
-      mixActive = false;
-      mixDone = false;
-      resetMixProgress();
-      refreshMixState();
-      refreshDoseAccess();
+      if (err?.name !== 'AbortError'){
+        alert(err?.message || 'Mix failed. Please try again.');
+      }
+      cancelMixAnimation(err?.name === 'AbortError' ? 'Stopped' : 'Idle');
     }finally{
+      toggleMixStop(false);
+      mixAbortController = null;
       if(!mixActive){
         if(mixBtn){
           mixBtn.disabled = false;
@@ -611,6 +669,14 @@
   }
 
   mixBtn?.addEventListener('click', runMixCycle);
+  mixStopBtn?.addEventListener('click', async ()=>{
+    cancelMixAnimation('Stopped');
+    try{ mixAbortController?.abort(); }
+    catch(_){}
+    mixAbortController = null;
+    try{ await fetch('/api/reservoirs/mix-concentrate/stop', { method:'POST' }); }
+    catch(_){}
+  });
 
   refreshMixState();
   refreshDoseAccess();

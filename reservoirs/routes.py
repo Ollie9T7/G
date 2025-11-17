@@ -144,7 +144,6 @@ def reservoir_wizard():
             if chosen:
                 session["wizard_selected_profile"] = chosen
                 session["wizard_concentrate_mixed"] = False
-                session["wizard_concentrate_mix_seconds"] = session.get("wizard_concentrate_mix_seconds", 60)
 
             if action == "choose_profile":
                 # re-render step 3 with nutrients hydrated
@@ -196,10 +195,10 @@ def reservoir_wizard():
     if step == 4 and selected_profile and nutrients is None:
         nutrients, selected_profile_name = _load_nutrients_for_selected(ctx, selected_profile)
 
-    if "wizard_concentrate_mix_seconds" not in session:
-        session["wizard_concentrate_mix_seconds"] = 60
-
-    mix_seconds = float(session.get("wizard_concentrate_mix_seconds") or 60)
+    try:
+        mix_seconds = float(session.get("wizard_concentrate_mix_seconds"))
+    except (TypeError, ValueError):
+        mix_seconds = None
 
     tpl_name = f"reservoir_wizard/step{step}.html"
     main = _compute_main_res_status()
@@ -875,9 +874,10 @@ def api_reservoirs_mix_concentrate():
         return jsonify({"ok": False, "error": "service.run_concentrate_mix_seconds not available"}), 500
 
     session["wizard_concentrate_mix_seconds"] = secs
-    session["wizard_concentrate_mixed"] = True
+    session["wizard_concentrate_mixed"] = False
 
-    run_concentrate_mix_seconds(secs)
+    completed = run_concentrate_mix_seconds(secs)
+    session["wizard_concentrate_mixed"] = bool(completed)
 
     try:
         pid = _active_profile_id()
@@ -889,7 +889,33 @@ def api_reservoirs_mix_concentrate():
     except Exception:
         pass
 
-    return jsonify({"ok": True, "seconds": secs})
+    return jsonify({"ok": True, "seconds": secs, "completed": bool(completed)})
+
+
+@reservoirs_bp.route("/api/reservoirs/mix-concentrate/stop", methods=["POST"])
+def api_reservoirs_mix_concentrate_stop():
+    ctx = _CTX()
+
+    try:
+        from reservoirs.service import cancel_concentrate_mix
+    except Exception:
+        cancel_concentrate_mix = None
+
+    if cancel_concentrate_mix is None:
+        return jsonify({"ok": False, "error": "service.cancel_concentrate_mix not available"}), 500
+
+    try:
+        cancel_concentrate_mix()
+        session["wizard_concentrate_mixed"] = False
+    except Exception:
+        return jsonify({"ok": False, "error": "unable to stop concentrate mix"}), 500
+
+    try:
+        ctx["LOGGER"].log_event("reservoir_mix_stop", "Concentrate mix emergency stop invoked")
+    except Exception:
+        pass
+
+    return jsonify({"ok": True})
 
 
 @reservoirs_bp.route("/api/reservoirs/mix", methods=["POST"])
