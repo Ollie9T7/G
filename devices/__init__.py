@@ -14,6 +14,7 @@ Public API (compat with current app.py):
 - _set_humidifier(on: bool)
 - _set_agitator(on: bool)
 - _set_air_pump(on: bool)
+- _set_concentrate_mix(on: bool)
 
 Also exports runtime flags (names preserved):
 - fan_configured, pump_configured, heater_configured, humidifier_configured, agitator_configured, air_pump_configured
@@ -54,6 +55,7 @@ MAIN_PUMP_PIN   = 27
 HEATER_PIN      = 24
 HUMIDIFIER_PIN  = 18
 AGITATOR_PIN    = 5
+CONCENTRATE_MIX_PIN = 7
 AIR_PUMP_PIN    = 25
 NUTRIENT_A_PIN  = 6
 NUTRIENT_B_PIN  = 26
@@ -64,6 +66,7 @@ HEATER_ACTIVE_HIGH      = True
 HUMIDIFIER_ACTIVE_HIGH  = True
 PUMP_ACTIVE_HIGH        = True
 AGITATOR_ACTIVE_HIGH    = True
+CONCENTRATE_MIX_ACTIVE_HIGH = True
 AIR_PUMP_ACTIVE_HIGH    = True
 NUTRIENT_ACTIVE_HIGH    = True
 
@@ -81,12 +84,14 @@ def _ensure_gpio_mode():
 # ---- Configured flags (names preserved) -----------------------------------
 fan_configured = pump_configured = heater_configured = humidifier_configured = False
 agitator_configured = False
+concentrate_mix_configured = False
 air_pump_configured = False
 nutrient_a_configured = False
 nutrient_b_configured = False
 
 fan_on = heater_on = humidifier_on = False
 agitator_on = False
+concentrate_mix_on = False
 air_pump_on = False
 
 fan_trigger_cause = None  # "temperature" | "humidity" | None
@@ -125,6 +130,12 @@ try:
     agitator_configured = True
 except Exception as e:
     print(f"⚠️ Failed to setup AGITATOR_PIN: {e}")
+
+try:
+    GPIO.setup(CONCENTRATE_MIX_PIN, GPIO.OUT, initial=_off_level(CONCENTRATE_MIX_ACTIVE_HIGH))
+    concentrate_mix_configured = True
+except Exception as e:
+    print(f"⚠️ Failed to setup CONCENTRATE_MIX_PIN: {e}")
 
 try:
     GPIO.setup(AIR_PUMP_PIN, GPIO.OUT, initial=_off_level(AIR_PUMP_ACTIVE_HIGH))
@@ -315,6 +326,33 @@ def _set_air_pump(on: bool):
             if not on:
                 sd["air_pump_phase_end_ts"] = None
                 sd["air_pump_time_remaining_s"] = None
+    except Exception:
+        pass
+
+
+def _set_concentrate_mix(on: bool):
+    """Toggle the concentrate mix relay on GPIO pin 7."""
+    global concentrate_mix_on
+    if not concentrate_mix_configured or on == concentrate_mix_on:
+        return
+
+    _ensure_gpio_mode()
+    GPIO.output(
+        CONCENTRATE_MIX_PIN,
+        _on_level(CONCENTRATE_MIX_ACTIVE_HIGH) if on else _off_level(CONCENTRATE_MIX_ACTIVE_HIGH),
+    )
+    concentrate_mix_on = on
+
+    try:
+        if _LOGGER is not None:
+            sd = _status()
+            _LOGGER.log_event(
+                "reservoir_mix",
+                msg=f"Concentrate mix relay {'ON' if on else 'OFF'}",
+                reason_code=("mix" if on else "mix_end"),
+                profile_id=sd.get("profile") if isinstance(sd, dict) else None,
+                actor="wizard",
+            )
     except Exception:
         pass
 

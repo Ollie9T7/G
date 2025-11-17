@@ -6,7 +6,7 @@ from typing import Optional, Dict, Any
 from time import monotonic as _mono
 
 from global_settings import load_global_settings
-from devices import _set_agitator, _set_nutrient_a, _set_nutrient_b
+from devices import _set_agitator, _set_concentrate_mix, _set_nutrient_a, _set_nutrient_b
 
 # NEW: capacity & conversion helpers
 from global_settings import usable_capacity_kg, water_kg_from_gross
@@ -137,6 +137,20 @@ def run_agitator(seconds: float) -> None:
             time.sleep(remaining if remaining < 0.02 else 0.02)
     finally:
         _set_agitator(False)
+
+
+def run_concentrate_mix(seconds: float) -> None:
+    """Exact-duration run for the concentrate mix relay (GPIO pin 7)."""
+    t_end = _mono() + max(0.0, float(seconds))
+    _set_concentrate_mix(True)
+    try:
+        while True:
+            remaining = t_end - _mono()
+            if remaining <= 0:
+                break
+            time.sleep(remaining if remaining < 0.02 else 0.02)
+    finally:
+        _set_concentrate_mix(False)
 
 # ── Precise, no-overlap dosing helpers ─────────────────────────────────────
 
@@ -296,5 +310,10 @@ def run_agitator_seconds(seconds: float) -> None:
     Wrapper so routes.py can call service.run_agitator_seconds(...).
     """
     run_agitator(seconds)
+
+
+def run_concentrate_mix_seconds(seconds: float) -> None:
+    """Wrapper so routes.py can trigger the concentrate mix relay."""
+    run_concentrate_mix(seconds)
 
 

@@ -143,6 +143,8 @@ def reservoir_wizard():
             chosen = (request.form.get("selected_profile") or request.form.get("profile") or "").strip()
             if chosen:
                 session["wizard_selected_profile"] = chosen
+                session["wizard_concentrate_mixed"] = False
+                session["wizard_concentrate_mix_seconds"] = session.get("wizard_concentrate_mix_seconds", 60)
 
             if action == "choose_profile":
                 # re-render step 3 with nutrients hydrated
@@ -164,7 +166,9 @@ def reservoir_wizard():
                     selected_profile=session.get("wizard_selected_profile"),
                     selected_profile_name=selected_profile_name,
                     nutrients=nutrients,
-                    main=main
+                    main=main,
+                    concentrate_mixed=bool(session.get("wizard_concentrate_mixed")),
+                    mix_seconds=float(session.get("wizard_concentrate_mix_seconds") or 60),
                 )
 
             if action == "next":
@@ -192,6 +196,11 @@ def reservoir_wizard():
     if step == 4 and selected_profile and nutrients is None:
         nutrients, selected_profile_name = _load_nutrients_for_selected(ctx, selected_profile)
 
+    if "wizard_concentrate_mix_seconds" not in session:
+        session["wizard_concentrate_mix_seconds"] = 60
+
+    mix_seconds = float(session.get("wizard_concentrate_mix_seconds") or 60)
+
     tpl_name = f"reservoir_wizard/step{step}.html"
     main = _compute_main_res_status()
 
@@ -207,6 +216,8 @@ def reservoir_wizard():
             selected_profile_name=selected_profile_name,
             nutrients=nutrients,
             main=main,
+            concentrate_mixed=bool(session.get("wizard_concentrate_mixed")),
+            mix_seconds=mix_seconds,
         )
 
     profiles_files = _list_profiles(ctx)
@@ -839,6 +850,46 @@ def api_reservoirs_dose():
 
 
 
+
+
+@reservoirs_bp.route("/api/reservoirs/mix-concentrate", methods=["POST"])
+def api_reservoirs_mix_concentrate():
+    """Run the concentrate mix relay (GPIO pin 7) for the requested seconds."""
+    ctx = _CTX()
+    body = request.get_json(silent=True) or {}
+
+    try:
+        secs = float(body.get("seconds") or 60)
+    except (TypeError, ValueError):
+        return jsonify({"ok": False, "error": "invalid seconds"}), 400
+
+    if secs <= 0:
+        return jsonify({"ok": False, "error": "seconds must be positive"}), 400
+
+    try:
+        from reservoirs.service import run_concentrate_mix_seconds
+    except Exception:
+        run_concentrate_mix_seconds = None
+
+    if run_concentrate_mix_seconds is None:
+        return jsonify({"ok": False, "error": "service.run_concentrate_mix_seconds not available"}), 500
+
+    session["wizard_concentrate_mix_seconds"] = secs
+    session["wizard_concentrate_mixed"] = True
+
+    run_concentrate_mix_seconds(secs)
+
+    try:
+        pid = _active_profile_id()
+        ctx["LOGGER"].log_event(
+            "reservoir_mix",
+            f"Concentrate mix relay ran for {secs} s",
+            profile_id=pid,
+        )
+    except Exception:
+        pass
+
+    return jsonify({"ok": True, "seconds": secs})
 
 
 @reservoirs_bp.route("/api/reservoirs/mix", methods=["POST"])

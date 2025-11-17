@@ -65,6 +65,10 @@
       width:100%; max-width:100%; padding:10px 12px; border-radius:10px;
       border:1px solid #2a3950; background:#0d1420; color:#e7eef7; font-size:14px;
     }
+    .row input[type="number"] {
+      width:140px; max-width:100%; padding:10px 12px; border-radius:10px;
+      border:1px solid #2a3950; background:#0d1420; color:#e7eef7; font-size:14px;
+    }
 
     .readout { border:1px solid #2a3950; border-radius:8px; background:#0d1420; padding:12px; }
     .readout h3 { margin:0 0 8px 0; font-size:15px; color:#e7eef7; }
@@ -98,6 +102,9 @@
 
     .dose-eta { margin-top:6px; font-size:12px; color:#9bb4d3; display:flex; justify-content:space-between; }
     .dose-eta b { color:#e7eef7; }
+
+    /* Mix progress (reuses dosing visuals) */
+    .mix-progress { margin-top:14px; }
 
     /* === Run button: full-width; hover glow; RUNNING = pulsing BLUE border; FINISHED = solid green === */
     .run-wide { margin-top:14px; display:flex; }
@@ -234,7 +241,36 @@
       </form>
     </fieldset>
 
-    <!-- Fieldset 2: Dosing -->
+    <!-- Fieldset 2: Mix concentrate containers -->
+    <fieldset class="box" id="mixBox">
+      <legend>Mix concentrate containers</legend>
+
+      <div class="row" style="margin-top:6px; align-items:flex-start;">
+        <label for="mixSeconds">Mix duration (seconds)</label>
+        <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+          <input type="number" id="mixSeconds" name="mix_seconds" min="1" step="1" value="{{ mix_seconds or 60 }}">
+          <button id="mixBtn" class="btn btn-blue" type="button"><i class="fa-solid fa-rotate"></i> Mix</button>
+          <span class="pill" id="mixState">Awaiting mix</span>
+        </div>
+      </div>
+
+      <div class="note">Run the concentrate mixer before dosing; nutrient pumps unlock after mixing.</div>
+
+      <div class="dose-card mix-progress" id="mixCard" aria-live="polite">
+        <h3><i class="fa-solid fa-rotate"></i> Mix progress</h3>
+        <div class="dose-meta">
+          <span>Planned: <b id="mixPlanned">—</b></span>
+          <span>Status: <b id="mixStatus">Idle</b></span>
+        </div>
+        <div class="bar" id="mixBar"><div class="fill" id="mixFill"></div></div>
+        <div class="dose-eta">
+          <span>Time</span>
+          <span><b id="mixEta">—</b></span>
+        </div>
+      </div>
+    </fieldset>
+
+    <!-- Fieldset 3: Dosing -->
     <fieldset class="box locked-section" id="doseBox" aria-disabled="true">
       <legend>Dose nutrients</legend>
 
@@ -297,6 +333,8 @@
   const LOCKED_PROF   = {{ (selected_profile or '') | tojson }};
   const LOCKED_NAME   = {{ (selected_profile_name or '') | tojson }};
   const NUTS_INIT     = {{ (nutrients or {}) | tojson }};
+  const MIX_DONE_INIT = {{ (concentrate_mixed or False) | tojson }};
+  const MIX_SECONDS_INIT = {{ (mix_seconds or 60) | tojson }};
 </script>
 
 
@@ -314,6 +352,15 @@
   const runBtn = $('#runBtn');
   const nextBtn = $('#nextBtn');
   const stopBtn = $('#stopBtn'); /* NEW */
+  const mixBtn = $('#mixBtn');
+  const mixSecondsInput = $('#mixSeconds');
+  const mixState = $('#mixState');
+  const mixCard = $('#mixCard');
+  const mixPlanned = $('#mixPlanned');
+  const mixStatus = $('#mixStatus');
+  const mixBar = $('#mixBar');
+  const mixFill = $('#mixFill');
+  const mixEta = $('#mixEta');
 
   // Elements in the dosing box
   const metaA_target = $('#metaA_target');
@@ -375,20 +422,200 @@
     doseBox.setAttribute('aria-disabled', enabled ? 'false' : 'true');
     if(enabled){
       doseBox.classList.remove('locked-section');
-      runBtn.disabled = false;
+      runBtn.disabled = !!runActive;
+      nextBtn.disabled = !!runActive;
     }else{
       doseBox.classList.add('locked-section');
       runBtn.disabled = true;
+      nextBtn.disabled = true;
     }
   }
 
   const serverLocked = !!LOCKED_PROF && Object.keys(NUTS_INIT || {}).length > 0;
-  setDoseSectionEnabled(serverLocked);
+  let mixDone = !!MIX_DONE_INIT;
+  let mixSeconds = Number.isFinite(Number(MIX_SECONDS_INIT)) ? Number(MIX_SECONDS_INIT) : 60;
+  let mixActive = false;
+  let mixTimer = null;
+  let mixStartTS = null;
+  if (mixSecondsInput){ mixSecondsInput.value = mixSeconds; }
+
+  function resetMixProgress(){
+    if (mixTimer) clearInterval(mixTimer);
+    mixTimer = null;
+    mixStartTS = null;
+
+    if (mixFill){
+      mixFill.style.transition = 'none';
+      mixFill.style.width = '0%';
+      mixFill.style.background = '';
+    }
+    if (mixEta) mixEta.textContent = '—';
+    if (mixPlanned) mixPlanned.textContent = '—';
+    if (mixStatus){
+      mixStatus.textContent = 'Idle';
+      mixStatus.classList.remove('is-done');
+    }
+  }
+
+  function paintMixComplete(){
+    if (mixFill){
+      mixFill.style.transition = 'none';
+      mixFill.style.width = '100%';
+      mixFill.style.background = 'var(--run-green)';
+    }
+    if (mixPlanned && mixSeconds){
+      mixPlanned.textContent = `${mixSeconds} s`;
+    }
+    if (mixStatus){
+      mixStatus.textContent = 'Done';
+      mixStatus.classList.add('is-done');
+    }
+    if (mixEta) mixEta.textContent = '0 s';
+  }
+
+  function refreshMixState(){
+    if(!mixState) return;
+    if(mixActive){
+      mixState.textContent = 'Mixing…';
+      mixState.style.background = '#2a3950';
+      mixState.style.color = '#c9d6ea';
+      mixState.style.borderColor = '#2a3950';
+    } else if(mixDone){
+      mixState.textContent = 'Mixed';
+      mixState.style.background = '#17391e';
+      mixState.style.color = '#9be8ac';
+      mixState.style.borderColor = '#26522d';
+      paintMixComplete();
+    } else {
+      mixState.textContent = 'Awaiting mix';
+      mixState.removeAttribute('style');
+    }
+  }
+
+  function refreshDoseAccess(){
+    setDoseSectionEnabled(serverLocked && mixDone);
+  }
+
+  function runMixAnimation(duration){
+    return new Promise(resolve => {
+      resetMixProgress();
+
+      if (!duration || duration <= 0){
+        mixActive = false;
+        mixDone = true;
+        refreshMixState();
+        refreshDoseAccess();
+        resolve();
+        return;
+      }
+
+      if (mixPlanned) mixPlanned.textContent = `${duration} s`;
+      if (mixStatus){
+        mixStatus.textContent = 'Mixing';
+        mixStatus.classList.remove('is-done');
+      }
+      if (mixEta) mixEta.textContent = fmtCountdown(duration);
+
+      mixActive = true;
+      refreshMixState();
+
+      mixStartTS = performance.now()/1000;
+      if (mixFill){
+        mixFill.style.background = '';
+        mixFill.style.transition = 'none';
+        mixFill.style.width = '0%';
+        requestAnimationFrame(()=>{
+          mixFill.style.transition = `width ${duration}s linear`;
+          mixFill.style.width = '100%';
+        });
+      }
+
+      const finish = () => {
+        if (mixTimer) clearInterval(mixTimer);
+        mixTimer = null;
+        mixActive = false;
+        mixDone = true;
+        paintMixComplete();
+        refreshMixState();
+        refreshDoseAccess();
+        resolve();
+      };
+
+      mixTimer = setInterval(()=>{
+        const elapsed = (performance.now()/1000) - mixStartTS;
+        const left = Math.max(0, duration - elapsed);
+        if (mixEta) mixEta.textContent = fmtCountdown(left);
+        if (left <= 0){ finish(); }
+      }, 200);
+    });
+  }
+
+  async function runMixCycle(){
+    const prevLabel = mixBtn?.innerHTML;
+    let secs = Number(mixSecondsInput?.value || mixSeconds || 60);
+
+    if (!Number.isFinite(secs) || secs <= 0){
+      alert('Please enter a positive number of seconds to mix.');
+      return;
+    }
+
+    mixDone = false;
+    mixActive = false;
+    resetMixProgress();
+    refreshMixState();
+    refreshDoseAccess();
+
+    try{
+      if(mixBtn){
+        mixBtn.disabled = true;
+        mixBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Mixing…';
+      }
+      if(mixSecondsInput) mixSecondsInput.disabled = true;
+
+      const res = await fetch('/api/reservoirs/mix-concentrate', {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ seconds: secs })
+      });
+
+      let out = null;
+      try{
+        out = await res.json();
+      }catch(_){}
+
+      if(!res.ok || !out?.ok){
+        const err = (out && (out.error || out.message)) || 'Mix failed. Please try again.';
+        throw new Error(err);
+      }
+
+      mixSeconds = Number.isFinite(Number(out.seconds)) ? Number(out.seconds) : secs;
+      if (mixSecondsInput) mixSecondsInput.value = mixSeconds;
+
+      await runMixAnimation(mixSeconds);
+    }catch(err){
+      alert(err?.message || 'Mix failed. Please try again.');
+      mixActive = false;
+      mixDone = false;
+      resetMixProgress();
+      refreshMixState();
+      refreshDoseAccess();
+    }finally{
+      if(!mixActive){
+        if(mixBtn){
+          mixBtn.disabled = false;
+          mixBtn.innerHTML = prevLabel;
+        }
+        if(mixSecondsInput) mixSecondsInput.disabled = false;
+      }
+    }
+  }
+
+  mixBtn?.addEventListener('click', runMixCycle);
+
+  refreshMixState();
+  refreshDoseAccess();
   if(serverLocked){
     paintNeeded(NUTS_INIT, liveLitres);
-    nextBtn.disabled = false;
-  } else {
-    nextBtn.disabled = true;
   }
 
   // ===== Deterministic progress (planned-time CSS transition) =====
@@ -566,7 +793,7 @@
       if (!running && runActive){
         // finished OR was cancelled
         runActive = false;
-        runBtn.disabled = false;
+        refreshDoseAccess();
         runBtn.classList.remove('is-running');
 
         if (cancelled){
@@ -615,12 +842,12 @@
   setInterval(poll, 400);
 
   function setRunningState(on) {
-    runBtn.disabled = on || !serverLocked;
-    nextBtn.disabled = on || !serverLocked;
+    runBtn.disabled = on || !(serverLocked && mixDone);
+    nextBtn.disabled = on || !(serverLocked && mixDone);
   }
 
   async function runDose(){
-    if(!serverLocked){ return; }
+    if(!serverLocked || !mixDone){ return; }
     
     // Ask for confirmation before running pumps
     const ok = confirm("Are you sure you want to run the nutrient pumps?");
