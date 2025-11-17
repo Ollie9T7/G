@@ -21,6 +21,7 @@ from reservoirs import reservoirs_bp
 from global_settings import usable_capacity_kg, full_gross_weight_kg, water_kg_from_gross
 import time  # <-- ADDED (used by /api/reservoirs/dose)
 import threading
+from reservoirs.persistence import save_last_fill_iso
 
 
 
@@ -893,7 +894,12 @@ def api_reservoirs_complete():
     try:
         sd["reservoir_last_fill_iso"] = iso_utc
     except Exception:
-        sd["reservoir_last_fill_iso"] = None
+        pass
+
+    try:
+        save_last_fill_iso(iso_utc)
+    except Exception:
+        pass
 
     payload = {
         "profile_used": profile_name,

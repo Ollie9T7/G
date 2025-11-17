@@ -72,6 +72,7 @@ from sensors.dht import read_humidity_top_bottom
 from sensors.ds18b20 import read_air_temps_top_bottom, read_water_temp
 from sensors.reservoir_eval import ReservoirTracker
 from reservoirs.routes import reservoirs_bp
+from reservoirs.persistence import load_last_fill_iso
 
 
 # ── Scale (HX711) raw access (sampler below uses it internally) ───────────
@@ -162,6 +163,7 @@ status_data = {
     "reservoir_weight_kg": None,
     "reservoir_water_kg": None,
     "pump_cycle_res_before_kg": None,
+    "reservoir_last_fill_iso": load_last_fill_iso(),
 
     # Agitator/Air pump timers
     "agitator_time_remaining_s": None,
