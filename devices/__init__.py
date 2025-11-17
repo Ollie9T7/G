@@ -163,7 +163,7 @@ except Exception as e:
 
 
 # ---- Device setters (unchanged behaviour + structured logs) --------------
-def _set_fan(on: bool):
+def _set_fan(on: bool, *, log: bool = True, notify: bool = True):
     global fan_on, fan_on_since, fan_trigger_cause
     if not fan_configured or on == fan_on:
         return
@@ -174,41 +174,47 @@ def _set_fan(on: bool):
         fan_on_since = None
     fan_on = on
 
-    try:
-        if _LOGGER is not None:
-            sd = _status()
-            _LOGGER.log_event(
-                "actuator_change",
-                msg=f"Extractor fan {'ON' if fan_on else 'OFF'}",
-                reason_code=("humidity_high" if (fan_trigger_cause == "humidity") else ("temp_high" if fan_on else "hysteresis_clear")),
-                profile_id=sd.get("profile") if isinstance(sd, dict) else None,
-                actor="rule_engine",
-                payload={
-                    "device_name": "<extractor fan>",
-                    "after_state": ("on" if on else "off"),
-                    "air_temp_c":         sd.get("temperature_c") if isinstance(sd, dict) else None,
-                    "air_rh_pct":         sd.get("humidity") if isinstance(sd, dict) else None,
-                    "water_temp_c":       sd.get("water_temperature") if isinstance(sd, dict) else None,
-                    "reservoir_water_kg": sd.get("reservoir_water_kg") if isinstance(sd, dict) else None,
-                },
-            )
-    except Exception:
-        pass
+    if log:
+        try:
+            if _LOGGER is not None:
+                sd = _status()
+                _LOGGER.log_event(
+                    "actuator_change",
+                    msg=f"Extractor fan {'ON' if fan_on else 'OFF'}",
+                    reason_code=(
+                        "humidity_high"
+                        if (fan_trigger_cause == "humidity")
+                        else ("temp_high" if fan_on else "hysteresis_clear")
+                    ),
+                    profile_id=sd.get("profile") if isinstance(sd, dict) else None,
+                    actor="rule_engine",
+                    payload={
+                        "device_name": "<extractor fan>",
+                        "after_state": ("on" if on else "off"),
+                        "air_temp_c": sd.get("temperature_c") if isinstance(sd, dict) else None,
+                        "air_rh_pct": sd.get("humidity") if isinstance(sd, dict) else None,
+                        "water_temp_c": sd.get("water_temperature") if isinstance(sd, dict) else None,
+                        "reservoir_water_kg": sd.get("reservoir_water_kg") if isinstance(sd, dict) else None,
+                    },
+                )
+        except Exception:
+            pass
 
-    try:
-        if _send_discord:
-            if fan_on:
-                cause = fan_trigger_cause or "temperature"
-                if cause == "humidity":
-                    _send_discord("Feels like a rainforest in here… Extracting moisture: **Extractor Fan: ON**")
-                else:
-                    _send_discord("Good heavens it's warm… Exchanging some air: **Extractor Fan: ON**")
-        fan_trigger_cause = None
-    except Exception:
-        pass
+    if notify:
+        try:
+            if _send_discord:
+                if fan_on:
+                    cause = fan_trigger_cause or "temperature"
+                    if cause == "humidity":
+                        _send_discord("Feels like a rainforest in here… Extracting moisture: **Extractor Fan: ON**")
+                    else:
+                        _send_discord("Good heavens it's warm… Exchanging some air: **Extractor Fan: ON**")
+            fan_trigger_cause = None
+        except Exception:
+            pass
 
 
-def _set_heater(on: bool):
+def _set_heater(on: bool, *, log: bool = True, notify: bool = True):
     global heater_on, heater_on_since
     if not heater_configured or on == heater_on:
         return
@@ -219,36 +225,38 @@ def _set_heater(on: bool):
         heater_on_since = None
     heater_on = on
 
-    try:
-        if _LOGGER is not None:
-            sd = _status()
-            _LOGGER.log_event(
-                "actuator_change",
-                msg=f"Heater {'ON' if heater_on else 'OFF'}",
-                reason_code=("temp_below_min" if heater_on else "hysteresis_clear"),
-                profile_id=sd.get("profile") if isinstance(sd, dict) else None,
-                actor="rule_engine",
-                payload={
-                    "device_name": "<heater>",
-                    "after_state": ("on" if on else "off"),
-                    "trigger": sd.get("last_trigger") if isinstance(sd, dict) else None,
-                    "air_temp_c":         sd.get("temperature_c") if isinstance(sd, dict) else None,
-                    "air_rh_pct":         sd.get("humidity") if isinstance(sd, dict) else None,
-                    "water_temp_c":       sd.get("water_temperature") if isinstance(sd, dict) else None,
-                    "reservoir_water_kg": sd.get("reservoir_water_kg") if isinstance(sd, dict) else None,
-                },
-            )
-    except Exception:
-        pass
+    if log:
+        try:
+            if _LOGGER is not None:
+                sd = _status()
+                _LOGGER.log_event(
+                    "actuator_change",
+                    msg=f"Heater {'ON' if heater_on else 'OFF'}",
+                    reason_code=("temp_below_min" if heater_on else "hysteresis_clear"),
+                    profile_id=sd.get("profile") if isinstance(sd, dict) else None,
+                    actor="rule_engine",
+                    payload={
+                        "device_name": "<heater>",
+                        "after_state": ("on" if on else "off"),
+                        "trigger": sd.get("last_trigger") if isinstance(sd, dict) else None,
+                        "air_temp_c": sd.get("temperature_c") if isinstance(sd, dict) else None,
+                        "air_rh_pct": sd.get("humidity") if isinstance(sd, dict) else None,
+                        "water_temp_c": sd.get("water_temperature") if isinstance(sd, dict) else None,
+                        "reservoir_water_kg": sd.get("reservoir_water_kg") if isinstance(sd, dict) else None,
+                    },
+                )
+        except Exception:
+            pass
 
-    try:
-        if _send_discord and heater_on:
-            _send_discord("Brrr. It's a little chilly...️ Adding some heat: **Heater: ON**")
-    except Exception:
-        pass
+    if notify:
+        try:
+            if _send_discord and heater_on:
+                _send_discord("Brrr. It's a little chilly...️ Adding some heat: **Heater: ON**")
+        except Exception:
+            pass
 
 
-def _set_humidifier(on: bool):
+def _set_humidifier(on: bool, *, log: bool = True, notify: bool = True):
     global humidifier_on, humidifier_on_since
     if not humidifier_configured or on == humidifier_on:
         return
@@ -259,72 +267,79 @@ def _set_humidifier(on: bool):
         humidifier_on_since = None
     humidifier_on = on
 
-    try:
-        if _LOGGER is not None:
-            sd = _status()
-            _LOGGER.log_event(
-                "actuator_change",
-                msg=f"Humidifier {'ON' if humidifier_on else 'OFF'}",
-                reason_code=("humidity_below_min" if humidifier_on else "hysteresis_clear"),
-                profile_id=sd.get("profile") if isinstance(sd, dict) else None,
-                actor="rule_engine",
-                payload={
-                    "device_name": "<humidifier>",
-                    "after_state": ("on" if on else "off"),
-                    "air_temp_c":         sd.get("temperature_c") if isinstance(sd, dict) else None,
-                    "air_rh_pct":         sd.get("humidity") if isinstance(sd, dict) else None,
-                    "water_temp_c":       sd.get("water_temperature") if isinstance(sd, dict) else None,
-                    "reservoir_water_kg": sd.get("reservoir_water_kg") if isinstance(sd, dict) else None,
-                },
-            )
-    except Exception:
-        pass
+    if log:
+        try:
+            if _LOGGER is not None:
+                sd = _status()
+                _LOGGER.log_event(
+                    "actuator_change",
+                    msg=f"Humidifier {'ON' if humidifier_on else 'OFF'}",
+                    reason_code=("humidity_below_min" if humidifier_on else "hysteresis_clear"),
+                    profile_id=sd.get("profile") if isinstance(sd, dict) else None,
+                    actor="rule_engine",
+                    payload={
+                        "device_name": "<humidifier>",
+                        "after_state": ("on" if on else "off"),
+                        "air_temp_c": sd.get("temperature_c") if isinstance(sd, dict) else None,
+                        "air_rh_pct": sd.get("humidity") if isinstance(sd, dict) else None,
+                        "water_temp_c": sd.get("water_temperature") if isinstance(sd, dict) else None,
+                        "reservoir_water_kg": sd.get("reservoir_water_kg") if isinstance(sd, dict) else None,
+                    },
+                )
+        except Exception:
+            pass
 
-    try:
-        if _send_discord and humidifier_on:
-            _send_discord("Paahh. It's dry in here...️ Adding some humidity: **Humidifier: ON**")
-    except Exception:
-        pass
+    if notify:
+        try:
+            if _send_discord and humidifier_on:
+                _send_discord("Paahh. It's dry in here...️ Adding some humidity: **Humidifier: ON**")
+        except Exception:
+            pass
 
 
-def _set_agitator(on: bool):
+def _set_agitator(on: bool, *, log: bool = True, notify: bool = True):
     global agitator_on
     if not agitator_configured or on == agitator_on:
         return
     GPIO.output(AGITATOR_PIN, _on_level(AGITATOR_ACTIVE_HIGH) if on else _off_level(AGITATOR_ACTIVE_HIGH))
     agitator_on = on
 
-    try:
-        if _LOGGER is not None:
-            sd = _status()
-            _LOGGER.log_event(
-                "irrigation_cycle",
-                msg=f"Agitator {'ON' if on else 'OFF'}",
-                reason_code=("premix" if on else "premix_end"),
-                profile_id=sd.get("profile") if isinstance(sd, dict) else None,
-                actor="scheduler",
-            )
-    except Exception:
-        pass
+    if log:
+        try:
+            if _LOGGER is not None:
+                sd = _status()
+                _LOGGER.log_event(
+                    "irrigation_cycle",
+                    msg=f"Agitator {'ON' if on else 'OFF'}",
+                    reason_code=("premix" if on else "premix_end"),
+                    profile_id=sd.get("profile") if isinstance(sd, dict) else None,
+                    actor="scheduler",
+                )
+        except Exception:
+            pass
 
 
-def _set_air_pump(on: bool):
+def _set_air_pump(on: bool, *, log: bool = True, notify: bool = True):
     global air_pump_on
     if not air_pump_configured or on == air_pump_on:
         return
     GPIO.output(AIR_PUMP_PIN, _on_level(AIR_PUMP_ACTIVE_HIGH) if on else _off_level(AIR_PUMP_ACTIVE_HIGH))
     air_pump_on = on
 
+    if log:
+        try:
+            if _LOGGER is not None:
+                sd = _status()
+                _LOGGER.log_event(
+                    "irrigation_cycle",
+                    msg=f"Air pump {'ON' if on else 'OFF'}",
+                    reason_code=("premix" if on else "premix_end"),
+                    profile_id=sd.get("profile") if isinstance(sd, dict) else None,
+                    actor="scheduler",
+                )
+        except Exception:
+            pass
     try:
-        if _LOGGER is not None:
-            sd = _status()
-            _LOGGER.log_event(
-                "irrigation_cycle",
-                msg=f"Air pump {'ON' if on else 'OFF'}",
-                reason_code=("premix" if on else "premix_end"),
-                profile_id=sd.get("profile") if isinstance(sd, dict) else None,
-                actor="scheduler",
-            )
         sd = _status()
         if isinstance(sd, dict):
             sd["air_pump_state"] = "ON" if on else "OFF"
@@ -335,7 +350,7 @@ def _set_air_pump(on: bool):
         pass
 
 
-def _set_concentrate_mix(on: bool):
+def _set_concentrate_mix(on: bool, *, log: bool = True, notify: bool = True):
     """Toggle the concentrate mix relay on GPIO pin 7."""
     global concentrate_mix_on
     if not concentrate_mix_configured or on == concentrate_mix_on:
@@ -355,21 +370,22 @@ def _set_concentrate_mix(on: bool):
     except Exception:
         pass
 
-    try:
-        if _LOGGER is not None:
-            sd = _status()
-            _LOGGER.log_event(
-                "reservoir_mix",
-                msg=f"Concentrate mix relay {'ON' if on else 'OFF'}",
-                reason_code=("mix" if on else "mix_end"),
-                profile_id=sd.get("profile") if isinstance(sd, dict) else None,
-                actor="wizard",
-            )
-    except Exception:
-        pass
+    if log:
+        try:
+            if _LOGGER is not None:
+                sd = _status()
+                _LOGGER.log_event(
+                    "reservoir_mix",
+                    msg=f"Concentrate mix relay {'ON' if on else 'OFF'}",
+                    reason_code=("mix" if on else "mix_end"),
+                    profile_id=sd.get("profile") if isinstance(sd, dict) else None,
+                    actor="wizard",
+                )
+        except Exception:
+            pass
 
 
-def _set_nutrient_a(on: bool):
+def _set_nutrient_a(on: bool, *, log: bool = True, notify: bool = True):
     if not nutrient_a_configured:
         return
     _ensure_gpio_mode()
@@ -393,22 +409,23 @@ def _set_nutrient_a(on: bool):
         pass
 
     # Optional: structured log (unchanged)
-    try:
-        if _LOGGER is not None:
-            sd = _status()
-            (_LOGGER.log_event)(
-                "actuator_change",
-                msg=f"Nutrient pump A {'ON' if on else 'OFF'}",
-                reason_code="nutrient_a_toggle",
-                profile_id=sd.get("profile") if isinstance(sd, dict) else None,
-                actor="wizard_or_calibration",
-                payload={"device_name": "nutrient_pump_a", "after_state": ("on" if on else "off")},
-            )
-    except Exception:
-        pass
+    if log:
+        try:
+            if _LOGGER is not None:
+                sd = _status()
+                (_LOGGER.log_event)(
+                    "actuator_change",
+                    msg=f"Nutrient pump A {'ON' if on else 'OFF'}",
+                    reason_code="nutrient_a_toggle",
+                    profile_id=sd.get("profile") if isinstance(sd, dict) else None,
+                    actor="wizard_or_calibration",
+                    payload={"device_name": "nutrient_pump_a", "after_state": ("on" if on else "off")},
+                )
+        except Exception:
+            pass
 
 
-def _set_nutrient_b(on: bool):
+def _set_nutrient_b(on: bool, *, log: bool = True, notify: bool = True):
     if not nutrient_b_configured:
         return
     _ensure_gpio_mode()
@@ -431,19 +448,20 @@ def _set_nutrient_b(on: bool):
         pass
 
     # Optional: structured log (unchanged)
-    try:
-        if _LOGGER is not None:
-            sd = _status()
-            (_LOGGER.log_event)(
-                "actuator_change",
-                msg=f"Nutrient pump B {'ON' if on else 'OFF'}",
-                reason_code="nutrient_b_toggle",
-                profile_id=sd.get("profile") if isinstance(sd, dict) else None,
-                actor="wizard_or_calibration",
-                payload={"device_name": "nutrient_pump_b", "after_state": ("on" if on else "off")},
-            )
-    except Exception:
-        pass
+    if log:
+        try:
+            if _LOGGER is not None:
+                sd = _status()
+                (_LOGGER.log_event)(
+                    "actuator_change",
+                    msg=f"Nutrient pump B {'ON' if on else 'OFF'}",
+                    reason_code="nutrient_b_toggle",
+                    profile_id=sd.get("profile") if isinstance(sd, dict) else None,
+                    actor="wizard_or_calibration",
+                    payload={"device_name": "nutrient_pump_b", "after_state": ("on" if on else "off")},
+                )
+        except Exception:
+            pass
 
 
 
@@ -455,25 +473,26 @@ def _set_nutrient_b(on: bool):
 
 pump_on = False  # track state for idempotence
 
-def _set_main_pump(on: bool):
+def _set_main_pump(on: bool, *, log: bool = True, notify: bool = True):
     global pump_on
     if not pump_configured or on == pump_on:
         return
     GPIO.output(MAIN_PUMP_PIN, _on_level(PUMP_ACTIVE_HIGH) if on else _off_level(PUMP_ACTIVE_HIGH))
     pump_on = on
     
-    try:
-        if _LOGGER is not None:
-            sd = _status()
-            _LOGGER.log_event(
-                "irrigation_cycle",
-                msg=f"Main irrigation pump {'ON' if on else 'OFF'}",
-                reason_code=("cycle_start" if on else "cycle_end"),
-                profile_id=sd.get("profile") if isinstance(sd, dict) else None,
-                actor="scheduler",
-            )
-    except Exception:
-        pass
+    if log:
+        try:
+            if _LOGGER is not None:
+                sd = _status()
+                _LOGGER.log_event(
+                    "irrigation_cycle",
+                    msg=f"Main irrigation pump {'ON' if on else 'OFF'}",
+                    reason_code=("cycle_start" if on else "cycle_end"),
+                    profile_id=sd.get("profile") if isinstance(sd, dict) else None,
+                    actor="scheduler",
+                )
+        except Exception:
+            pass
 
 
 

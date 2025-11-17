@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
@@ -10,154 +10,112 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <style>
     :root {
-      --bg: #0f172a;
-      --card: #111827;
-      --border: #1f2937;
-      --text: #e5e7eb;
-      --muted: #9ca3af;
-      --accent: #22d3ee;
-      --pill-on: #22c55e;
-      --pill-off: #ef4444;
+      --w: 850px; --pad: 16px; --gap: 14px; --br: 10px;
+      --ink: #e7eef7; --muted:#aac2de; --hint:#9bb4d3;
+      --bg: #0b0f14; --card:#121925; --border:#243247; --well:#0d1420; --well2:#1e2a3a;
+      --ok:#7bd88f; --bad:#ff7b7b; --accent:#1e5cff;
     }
-    * { box-sizing: border-box; }
-    body {
-      margin: 0;
-      font-family: 'Open Sans', system-ui, -apple-system, sans-serif;
-      background: var(--bg);
-      color: var(--text);
-      min-height: 100vh;
+    *, *::before, *::after { box-sizing: border-box; }
+    html, body { margin:0; padding:0; }
+    body { font-family: 'Open Sans', system-ui, -apple-system, sans-serif; background:var(--bg); color:var(--ink); }
+
+    header, .header, .site-header, nav.header, nav.top, .topnav {
+      max-width: var(--w);
+      margin: 0 auto;
+      padding: 0 var(--pad);
     }
-    header {
-      padding: 20px 24px;
-      border-bottom: 1px solid var(--border);
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-    }
-    .title {
-      font-size: 22px;
-      font-weight: 700;
-      letter-spacing: 0.2px;
-    }
-    .subtitle {
-      color: var(--muted);
-      margin-top: 4px;
-      font-size: 14px;
-    }
-    .nav-link {
-      color: var(--accent);
-      text-decoration: none;
-      font-weight: 600;
-    }
-    .wrapper { padding: 16px 24px 32px; }
+
+    .wrap { max-width: var(--w); margin: 28px auto; padding: 0 var(--pad) 40px; }
+    .topbar { display:flex; gap:12px; align-items:flex-start; justify-content:space-between; margin-bottom: 12px; }
+    .title-block h1 { margin:0 0 6px 0; font-size:22px; font-weight:700; }
+    .page-description { margin:0; color:var(--hint); font-size:14px; line-height:1.5; }
+    .pill { padding:4px 10px; border-radius:999px; border:1px solid #2a3950; background:var(--well); color:var(--muted); font-size:12px; font-weight:700; text-transform:uppercase; letter-spacing:.02em; }
+    .pill.on { color:#0c141f; background: var(--ok); border-color: #7bd88f; }
+    .pill.off { color:#2b1c24; background:#f18aa1; border-color:#f18aa1; }
+
     .banner {
-      background: #0b1220;
+      background: var(--well);
       border: 1px solid var(--border);
-      border-radius: 10px;
+      border-radius: var(--br);
       padding: 12px 14px;
-      color: var(--muted);
+      color: var(--hint);
       margin-bottom: 18px;
       display: flex;
       gap: 10px;
       align-items: center;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.28);
     }
-    .card-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-      gap: 14px;
-    }
+    .banner strong { color: var(--ink); }
+
+    .card-grid { display:grid; grid-template-columns: repeat(auto-fit, minmax(360px, 1fr)); gap: var(--gap); }
     .card {
       background: var(--card);
       border: 1px solid var(--border);
-      border-radius: 12px;
+      border-radius: var(--br);
       padding: 16px;
       display: flex;
       flex-direction: column;
       gap: 12px;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.35);
+      box-shadow: 0 4px 14px rgba(0,0,0,0.35);
     }
-    .card-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      font-weight: 700;
-      letter-spacing: 0.2px;
-    }
-    .pill {
-      padding: 4px 10px;
-      border-radius: 999px;
-      font-size: 12px;
-      font-weight: 700;
-      letter-spacing: 0.4px;
-      color: #0b111f;
-    }
-    .pill.on { background: var(--pill-on); }
-    .pill.off { background: var(--pill-off); color: #111827; }
+    .card-head { display:flex; justify-content:space-between; align-items:center; gap:10px; }
+    .device-meta { display:flex; gap:10px; align-items:center; }
+    .icon-box { width:40px; height:40px; border-radius:10px; background:var(--well2); color:var(--ink); display:grid; place-items:center; border:1px solid var(--border); }
+    .device-title { font-weight:700; letter-spacing:.2px; }
+
+    .toggle-row { display:flex; align-items:center; gap:12px; }
     .toggle {
       position: relative;
-      width: 48px;
-      height: 26px;
-      background: #1f2937;
-      border-radius: 20px;
+      width: 54px;
+      height: 30px;
+      background: #0d1420;
+      border-radius: 22px;
       border: 1px solid var(--border);
       cursor: pointer;
       transition: all 0.2s ease;
+      box-shadow: inset 0 0 0 1px rgba(255,255,255,0.02);
     }
     .toggle::after {
       content: '';
       position: absolute;
-      top: 3px;
-      left: 3px;
-      width: 20px;
-      height: 20px;
+      top: 4px;
+      left: 4px;
+      width: 22px;
+      height: 22px;
       background: #fff;
       border-radius: 50%;
       transition: transform 0.2s ease;
-      box-shadow: 0 2px 6px rgba(0,0,0,0.35);
+      box-shadow: 0 2px 6px rgba(0,0,0,0.45);
     }
-    .toggle.on {
-      background: #0ea5e9;
-      border-color: #38bdf8;
-    }
-    .toggle.on::after { transform: translateX(22px); }
-    .card-footer {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      color: var(--muted);
-      font-size: 13px;
-    }
-    .status-line { color: var(--muted); font-size: 13px; }
-    .grid-item { display: flex; gap: 12px; align-items: center; }
-    .icon-box {
-      width: 38px;
-      height: 38px;
-      border-radius: 10px;
-      background: #0b1220;
-      display: grid;
-      place-items: center;
-      color: var(--accent);
-      border: 1px solid var(--border);
-    }
-    .device-name { font-weight: 700; }
-    .toggle-row { display: flex; align-items: center; gap: 10px; }
+    .toggle.on { background: #17305c; border-color:#2a4b7a; box-shadow: 0 0 0 1px rgba(30,92,255,0.1), 0 12px 24px rgba(0,0,0,0.35); }
+    .toggle.on::after { transform: translateX(24px); }
+
+    .status-line { color: var(--hint); font-size: 13px; }
+    .card-footer { display:flex; justify-content:space-between; gap:10px; color: var(--muted); font-size:12px; }
     .muted { color: var(--muted); }
+
+    @media (max-width: 720px) {
+      .topbar { flex-direction: column; align-items:flex-start; }
+      .card-grid { grid-template-columns: 1fr; }
+    }
   </style>
 </head>
 <body>
-  <header>
-    <div>
-      <div class="title">Manual Override</div>
-      <div class="subtitle">Flip any device on or off instantly, even while a profile is running.</div>
+  {% include "header2.html" %}
+  <div class="wrap">
+    <div class="topbar">
+      <div class="title-block">
+        <h1>Manual override</h1>
+        <p class="page-description">Flip any device on or off instantly without losing the automated safeguards.</p>
+      </div>
+      <span class="pill" id="profile-label">Profile: none</span>
     </div>
-    <a href="/" class="nav-link"><i class="fa-solid fa-arrow-left"></i> Back to Dashboard</a>
-  </header>
-  <div class="wrapper">
+
     <div class="banner">
       <i class="fa-solid fa-circle-info"></i>
       <div>
-        <div id="profile-label">Profile: None running</div>
-        <div class="muted">Actions are logged as manual overrides with their runtimes.</div>
+        <div><strong>Manual actions are logged</strong> separately and include how long each device was active.</div>
+        <div class="muted">Automation still runs when no manual override is active. Discord alerts stay silent for manual toggles.</div>
       </div>
     </div>
 
@@ -179,6 +137,14 @@
 
     function pillClass(state) { return state === 'ON' ? 'pill on' : 'pill off'; }
 
+    function fmtDuration(sec){
+      if (!sec && sec !== 0) return '';
+      const s = Math.round(sec);
+      if (s < 60) return `${s}s`;
+      const m = Math.floor(s/60); const r = s % 60;
+      return `${m}m ${r}s`;
+    }
+
     function buildCards() {
       const grid = document.getElementById('card-grid');
       grid.innerHTML = '';
@@ -186,10 +152,10 @@
         const card = document.createElement('div');
         card.className = 'card';
         card.innerHTML = `
-          <div class="card-header">
-            <div class="grid-item">
+          <div class="card-head">
+            <div class="device-meta">
               <div class="icon-box"><i class="fa-solid ${dev.icon}"></i></div>
-              <div class="device-name">${dev.label}</div>
+              <div class="device-title">${dev.label}</div>
             </div>
             <span class="pill off" data-pill="${dev.key}">OFF</span>
           </div>
@@ -232,7 +198,7 @@
 
     function applyStatus(payload) {
       const profile = payload.running_profile;
-      document.getElementById('profile-label').textContent = profile ? `Profile running: ${profile}` : 'Profile: None running';
+      document.getElementById('profile-label').textContent = profile ? `Profile: ${profile}` : 'Profile: none';
       const devices = payload.devices || {};
       DEVICES.forEach(dev => {
         const info = devices[dev.key] || {};
@@ -251,13 +217,13 @@
           toggle.setAttribute('aria-checked', state === 'ON');
         }
         if (statusLine) {
-          statusLine.textContent = info.manual_active ? 'Manual override active' : 'Manual override idle';
+          statusLine.textContent = info.manual_active ? 'Manual override active' : 'Automation in control';
         }
         if (since) {
           since.textContent = info.since ? `Since: ${info.since}` : '';
         }
         if (duration) {
-          duration.textContent = info.last_duration_s ? `Last run: ${Math.round(info.last_duration_s)}s` : '';
+          duration.textContent = info.last_duration_s != null ? `Last run: ${fmtDuration(info.last_duration_s)}` : '';
         }
       });
     }

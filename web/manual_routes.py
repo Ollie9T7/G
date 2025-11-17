@@ -107,8 +107,8 @@ def _log_manual(device_key: str, new_state: str, duration_s: float | None = None
         payload["duration_s"] = round(duration_s, 2)
     try:
         LOGGER().log_event(
-            "manual_override",
-            msg=f"{label} {'ON' if new_state == 'ON' else 'OFF'} via manual override",
+            "actuator_change",
+            msg=f"{label} {'ON' if new_state == 'ON' else 'OFF'} via manual control",
             reason_code=f"manual_{new_state.lower()}",
             profile_id=running_profile(),
             actor="manual_override_ui",
@@ -128,19 +128,30 @@ def _apply_toggle(device_key: str, turn_on: bool):
 
     current_state = _state_string(sd.get(state_key)) if state_key else "OFF"
     desired_state = "ON" if turn_on else "OFF"
+
+    now_m = _mono()
     if current_state == desired_state:
-        entry["active"] = True
-        entry["state"] = desired_state
+        if turn_on:
+            entry.update(
+                active=True,
+                state="ON",
+                since_mono=entry.get("since_mono") or now_m,
+                since_iso=entry.get("since_iso") or datetime.datetime.utcnow().isoformat() + "Z",
+                last_duration_s=None,
+            )
+            _log_manual(device_key, "ON", None)
+        else:
+            entry.update(active=False, state="OFF", since_mono=None, since_iso=None)
+            _log_manual(device_key, "OFF", None)
         return
 
-    setter(turn_on)
+    setter(turn_on, log=False, notify=False)
     if state_key:
         if device.get("bool_state"):
             sd[state_key] = bool(turn_on)
         else:
             sd[state_key] = desired_state
 
-    now_m = _mono()
     if turn_on:
         entry.update(
             active=True,
@@ -158,7 +169,7 @@ def _apply_toggle(device_key: str, turn_on: bool):
                 duration = max(0.0, float(now_m) - float(since))
         except Exception:
             duration = None
-        entry.update(active=True, state="OFF", last_duration_s=duration, since_mono=None, since_iso=None)
+        entry.update(active=False, state="OFF", last_duration_s=duration, since_mono=None, since_iso=None)
         _log_manual(device_key, "OFF", duration)
 
 
