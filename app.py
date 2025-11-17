@@ -55,14 +55,12 @@ except Exception:
 
 
 # ───────────────────────────── App-local imports ───────────────────────────
+import devices
 from devices import (
     init_actuators,
     _set_fan, _set_heater, _set_humidifier, _set_agitator, _set_air_pump, _set_main_pump,
     apply_outputs_from_status, cleanup_gpio as devices_cleanup_gpio,
     fan_configured, pump_configured, heater_configured, humidifier_configured, agitator_configured, air_pump_configured,
-    fan_on, heater_on, humidifier_on, agitator_on, air_pump_on,
-    fan_on_since, heater_on_since,
-    fan_trigger_cause,
     _ensure_gpio_mode,
 )
 
@@ -1328,7 +1326,7 @@ def simulate_profile(profile_name: str, profile_data: dict):
             _set_heater(False);     status_data["heater_state"] = "OFF"
             _set_humidifier(False); status_data["humidifier_state"] = "OFF"
         else:
-            fan_should_on = fan_on
+            fan_should_on = devices.fan_on
             fan_cause = None
             if not status_data.get("paused", False):
                 t_max = status_data.get("temperature_max")
@@ -1353,11 +1351,11 @@ def simulate_profile(profile_name: str, profile_data: dict):
                         if not (_last_temp is not None and t_max is not None and _last_temp > t_max):
                             fan_should_on = False
             fan_min_on = int(gs.get("fan_min_on_s", 0) or 0)
-            if not fan_should_on and fan_on and fan_on_since is not None and (_mono() - fan_on_since) < fan_min_on:
+            if (not fan_should_on and devices.fan_on and devices.fan_on_since is not None
+                    and (_mono() - devices.fan_on_since) < fan_min_on):
                 fan_should_on = True
-            global fan_trigger_cause
-            if not fan_on and fan_should_on:
-                fan_trigger_cause = fan_cause or "temperature"
+            if not devices.fan_on and fan_should_on:
+                devices.fan_trigger_cause = fan_cause or "temperature"
             status_data["fan_state"] = "ON" if fan_should_on else "OFF"
             _set_fan(fan_should_on)
 
@@ -1367,13 +1365,14 @@ def simulate_profile(profile_name: str, profile_data: dict):
                 HYST = float((gs.get("hysteresis_temp_heater_c")
                              if gs.get("hysteresis_temp_heater_c") is not None
                              else gs.get("hysteresis_temp_c", 0.5)) or 0.0)
-                heater_should_on = heater_on
+                heater_should_on = devices.heater_on
                 if _last_temp < t_min:
                     heater_should_on = True
                 elif _last_temp >= (t_min + HYST):
                     heater_should_on = False
                 heater_min_on = int(gs.get("heater_min_on_s", 0) or 0)
-                if (not heater_should_on) and heater_on and heater_on_since is not None and (_mono() - heater_on_since) < heater_min_on:
+                if ((not heater_should_on) and devices.heater_on and devices.heater_on_since is not None
+                        and (_mono() - devices.heater_on_since) < heater_min_on):
                     heater_should_on = True
                 _set_heater(heater_should_on)
                 status_data["heater_state"] = "ON" if heater_should_on else "OFF"
@@ -1384,11 +1383,15 @@ def simulate_profile(profile_name: str, profile_data: dict):
                 HUM_HYST = float((gs.get("hysteresis_humidity_humidifier_pct")
                                  if gs.get("hysteresis_humidity_humidifier_pct") is not None
                                  else gs.get("hysteresis_humidity_pct", 1.5)) or 0.0)
-                humid_should_on = (status_data.get("humidifier_state") == "ON")
+                humid_should_on = devices.humidifier_on
                 if _last_humidity < h_min:
                     humid_should_on = True
                 elif _last_humidity >= (h_min + HUM_HYST):
                     humid_should_on = False
+                humidifier_min_on = int(gs.get("humidifier_min_on_s", 0) or 0)
+                if ((not humid_should_on) and devices.humidifier_on and devices.humidifier_on_since is not None
+                        and (_mono() - devices.humidifier_on_since) < humidifier_min_on):
+                    humid_should_on = True
                 _set_humidifier(humid_should_on)
                 status_data["humidifier_state"] = "ON" if humid_should_on else "OFF"
 

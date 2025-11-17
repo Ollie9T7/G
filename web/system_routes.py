@@ -139,6 +139,7 @@ def settings_global():
             "hysteresis_humidity_extractor_pct",
             "heater_min_on_s",
             "fan_min_on_s",
+            "humidifier_min_on_s",
             "absolute_temp_min_c",
             "absolute_temp_max_c",
             "absolute_humidity_min_pct",

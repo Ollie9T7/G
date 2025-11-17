@@ -99,6 +99,7 @@ fan_trigger_cause = None  # "temperature" | "humidity" | None
 # Anti short-cycle timers
 fan_on_since = None
 heater_on_since = None
+humidifier_on_since = None
 
 # ---- Hardware setup (unchanged) ------------------------------------------
 try:
@@ -248,10 +249,14 @@ def _set_heater(on: bool):
 
 
 def _set_humidifier(on: bool):
-    global humidifier_on
+    global humidifier_on, humidifier_on_since
     if not humidifier_configured or on == humidifier_on:
         return
     GPIO.output(HUMIDIFIER_PIN, _on_level(HUMIDIFIER_ACTIVE_HIGH) if on else _off_level(HUMIDIFIER_ACTIVE_HIGH))
+    if on and not humidifier_on:
+        humidifier_on_since = _mono()
+    if not on:
+        humidifier_on_since = None
     humidifier_on = on
 
     try:

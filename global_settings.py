@@ -39,6 +39,7 @@ DEFAULTS = {
     # Anti short-cycle (minimum ON times in seconds)
     "heater_min_on_s": 30,
     "fan_min_on_s": 15,
+    "humidifier_min_on_s": 30,
 
     # Absolute hard limits
     "absolute_temp_min_c": 5.0,
@@ -217,6 +218,7 @@ def validate_settings(raw: dict):
     # Anti short-cycle
     as_int("heater_min_on_s", lo=0, hi=3600)
     as_int("fan_min_on_s", lo=0, hi=3600)
+    as_int("humidifier_min_on_s", lo=0, hi=3600)
 
     # Hard limits
     as_float("absolute_temp_min_c", lo=-20, hi=80)
