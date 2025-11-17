@@ -287,7 +287,6 @@ def _set_agitator(on: bool):
                 reason_code=("premix" if on else "premix_end"),
                 profile_id=sd.get("profile") if isinstance(sd, dict) else None,
                 actor="scheduler",
-                payload={"device_name": "agitator", "after_state": ("on" if on else "off")},
             )
     except Exception:
         pass
@@ -304,12 +303,11 @@ def _set_air_pump(on: bool):
         if _LOGGER is not None:
             sd = _status()
             _LOGGER.log_event(
-                "actuator_change",
+                "irrigation_cycle",
                 msg=f"Air pump {'ON' if on else 'OFF'}",
-                reason_code="air_pump_toggle",
+                reason_code=("premix" if on else "premix_end"),
                 profile_id=sd.get("profile") if isinstance(sd, dict) else None,
                 actor="scheduler",
-                payload={"device_name": "air_pump", "after_state": ("on" if on else "off")},
             )
         sd = _status()
         if isinstance(sd, dict):
@@ -413,6 +411,23 @@ def _set_main_pump(on: bool):
         return
     GPIO.output(MAIN_PUMP_PIN, _on_level(PUMP_ACTIVE_HIGH) if on else _off_level(PUMP_ACTIVE_HIGH))
     pump_on = on
+    
+    try:
+        if _LOGGER is not None:
+            sd = _status()
+            _LOGGER.log_event(
+                "irrigation_cycle",
+                msg=f"Main irrigation pump {'ON' if on else 'OFF'}",
+                reason_code=("cycle_start" if on else "cycle_end"),
+                profile_id=sd.get("profile") if isinstance(sd, dict) else None,
+                actor="scheduler",
+            )
+    except Exception:
+        pass
+
+
+
+
 
 
 
