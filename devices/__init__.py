@@ -349,6 +349,13 @@ def _set_concentrate_mix(on: bool):
     concentrate_mix_on = on
 
     try:
+        sd = _status()
+        if isinstance(sd, dict):
+            sd["concentrate_mix_state"] = "ON" if on else "OFF"
+    except Exception:
+        pass
+
+    try:
         if _LOGGER is not None:
             sd = _status()
             _LOGGER.log_event(

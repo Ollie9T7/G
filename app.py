@@ -163,6 +163,12 @@ status_data = {
     "pump_cycle_res_before_kg": None,
     "reservoir_last_fill_iso": load_last_fill_iso(),
 
+    # Manual overrides (per-device state + timers)
+    "manual_overrides": {},
+
+    # Concentrate mixer state (used as nutrient stirrer)
+    "concentrate_mix_state": "OFF",
+
     # Agitator/Air pump timers
     "agitator_time_remaining_s": None,
     "agitator_phase_end_ts": None,
@@ -1320,8 +1326,31 @@ def simulate_profile(profile_name: str, profile_data: dict):
 
 
 
+                # Manual override helpers (per-device opt-out from automation)
+        manual_overrides = status_data.setdefault("manual_overrides", {})
+
+        def _manual_entry(name: str):
+            return manual_overrides.get(name, {}) if isinstance(manual_overrides, dict) else {}
+
+        def _manual_active(name: str) -> bool:
+            try:
+                return bool(_manual_entry(name).get("active"))
+            except Exception:
+                return False
+
+        def _manual_on(name: str) -> bool:
+            try:
+                return str(_manual_entry(name).get("state", "OFF")).upper() == "ON"
+            except Exception:
+                return False
+
+
         # ─── Climate control (fan/heater/humidifier) ───
-        if _last_temp is None or _last_humidity is None:
+        if _manual_active("extractor"):
+            desired = _manual_on("extractor")
+            _set_fan(desired)
+            status_data["fan_state"] = "ON" if desired else "OFF"
+        elif _last_temp is None or _last_humidity is None:
             _set_fan(False);        status_data["fan_state"] = "OFF"
             _set_heater(False);     status_data["heater_state"] = "OFF"
             _set_humidifier(False); status_data["humidifier_state"] = "OFF"
@@ -1360,67 +1389,114 @@ def simulate_profile(profile_name: str, profile_data: dict):
             _set_fan(fan_should_on)
 
             # heater
-            t_min = status_data.get("temperature_min")
-            if t_min is not None and _last_temp is not None:
-                HYST = float((gs.get("hysteresis_temp_heater_c")
-                             if gs.get("hysteresis_temp_heater_c") is not None
-                             else gs.get("hysteresis_temp_c", 0.5)) or 0.0)
-                heater_should_on = devices.heater_on
-                if _last_temp < t_min:
-                    heater_should_on = True
-                elif _last_temp >= (t_min + HYST):
-                    heater_should_on = False
-                heater_min_on = int(gs.get("heater_min_on_s", 0) or 0)
-                if ((not heater_should_on) and devices.heater_on and devices.heater_on_since is not None
-                        and (_mono() - devices.heater_on_since) < heater_min_on):
-                    heater_should_on = True
-                _set_heater(heater_should_on)
-                status_data["heater_state"] = "ON" if heater_should_on else "OFF"
+            if _manual_active("heater"):
+                desired_heat = _manual_on("heater")
+                _set_heater(desired_heat)
+                status_data["heater_state"] = "ON" if desired_heat else "OFF"
+            else:
+                t_min = status_data.get("temperature_min")
+                if t_min is not None and _last_temp is not None:
+                    HYST = float((gs.get("hysteresis_temp_heater_c")
+                                 if gs.get("hysteresis_temp_heater_c") is not None
+                                 else gs.get("hysteresis_temp_c", 0.5)) or 0.0)
+                    heater_should_on = devices.heater_on
+                    if _last_temp < t_min:
+                        heater_should_on = True
+                    elif _last_temp >= (t_min + HYST):
+                        heater_should_on = False
+                    heater_min_on = int(gs.get("heater_min_on_s", 0) or 0)
+                    if ((not heater_should_on) and devices.heater_on and devices.heater_on_since is not None
+                            and (_mono() - devices.heater_on_since) < heater_min_on):
+                        heater_should_on = True
+                    _set_heater(heater_should_on)
+                    status_data["heater_state"] = "ON" if heater_should_on else "OFF"
 
             # humidifier
-            h_min = status_data.get("humidity_min")
-            if h_min is not None and _last_humidity is not None:
-                HUM_HYST = float((gs.get("hysteresis_humidity_humidifier_pct")
-                                 if gs.get("hysteresis_humidity_humidifier_pct") is not None
-                                 else gs.get("hysteresis_humidity_pct", 1.5)) or 0.0)
-                humid_should_on = devices.humidifier_on
-                if _last_humidity < h_min:
-                    humid_should_on = True
-                elif _last_humidity >= (h_min + HUM_HYST):
-                    humid_should_on = False
-                humidifier_min_on = int(gs.get("humidifier_min_on_s", 0) or 0)
-                if ((not humid_should_on) and devices.humidifier_on and devices.humidifier_on_since is not None
-                        and (_mono() - devices.humidifier_on_since) < humidifier_min_on):
-                    humid_should_on = True
-                _set_humidifier(humid_should_on)
-                status_data["humidifier_state"] = "ON" if humid_should_on else "OFF"
+            if _manual_active("humidifier"):
+                desired_humid = _manual_on("humidifier")
+                _set_humidifier(desired_humid)
+                status_data["humidifier_state"] = "ON" if desired_humid else "OFF"
+            else:
+                h_min = status_data.get("humidity_min")
+                if h_min is not None and _last_humidity is not None:
+                    HUM_HYST = float((gs.get("hysteresis_humidity_humidifier_pct")
+                                     if gs.get("hysteresis_humidity_humidifier_pct") is not None
+                                     else gs.get("hysteresis_humidity_pct", 1.5)) or 0.0)
+                    humid_should_on = devices.humidifier_on
+                    if _last_humidity < h_min:
+                        humid_should_on = True
+                    elif _last_humidity >= (h_min + HUM_HYST):
+                        humid_should_on = False
+                    humidifier_min_on = int(gs.get("humidifier_min_on_s", 0) or 0)
+                    if ((not humid_should_on) and devices.humidifier_on and devices.humidifier_on_since is not None
+                            and (_mono() - devices.humidifier_on_since) < humidifier_min_on):
+                        humid_should_on = True
+                    _set_humidifier(humid_should_on)
+                    status_data["humidifier_state"] = "ON" if humid_should_on else "OFF"
 
         # ─── Pump window hard gate ───
         win_on  = profile_data.get("pump", {}).get("_win_on_h")
         win_off = profile_data.get("pump", {}).get("_win_off_h")
         allowed_now = _in_hour_window(win_on, win_off)
+        manual_pump_active = _manual_active("main_pump")
+        manual_ag_active = _manual_active("agitator_pump")
+        manual_air_active = _manual_active("air_pump")
+
+        if manual_pump_active:
+            desired_pump = _manual_on("main_pump")
+            _set_main_pump(desired_pump)
+            status_data["pump_state"] = "ON" if desired_pump else "OFF"
+            status_data["pump_phase_end_ts"] = None
+            status_data["pump_time_remaining_s"] = None
+        if manual_ag_active:
+            desired_ag = _manual_on("agitator_pump")
+            _set_agitator(desired_ag)
+            status_data["agitator_state"] = "ON" if desired_ag else "OFF"
+            status_data["agitator_phase_end_ts"] = None
+            status_data["agitator_time_remaining_s"] = None
+        if manual_air_active:
+            desired_air = _manual_on("air_pump")
+            _set_air_pump(desired_air)
+            status_data["air_pump_state"] = "ON" if desired_air else "OFF"
+            status_data["air_pump_phase_end_ts"] = None
+            status_data["air_pump_time_remaining_s"] = None
+
         if not allowed_now:
-            if status_data.get("pump_state") == "ON":
+            if status_data.get("pump_state") == "ON" and not manual_pump_active:
                 status_data["pump_state"] = "OFF"
                 _set_main_pump(False)
                 status_data["pump_phase_end_ts"] = None
                 status_data["pump_time_remaining_s"] = None
-            if status_data.get("agitator_state") == "ON":
+            if status_data.get("agitator_state") == "ON" and not manual_ag_active:
                 _set_agitator(False); status_data["agitator_state"] = "OFF"
                 status_data["agitator_phase_end_ts"] = None
                 status_data["agitator_time_remaining_s"] = None
-            if status_data.get("air_pump_state") == "ON":
+            if status_data.get("air_pump_state") == "ON" and not manual_air_active:
                 _set_air_pump(False); status_data["air_pump_state"] = "OFF"
                 status_data["air_pump_phase_end_ts"] = None
                 status_data["air_pump_time_remaining_s"] = None
             next_on_due_at = _next_window_open_ts(win_on, win_off, now_dt=datetime.datetime.now())
-            if STOP_EVENT.wait(0.25):
-                return
-            continue
+            if not (manual_pump_active or manual_ag_active or manual_air_active):
+                if STOP_EVENT.wait(0.25):
+                    return
+                continue
 
 
         # ─── Scheduler (pump + premix) ───
-        if pump_off <= 0 and pump_on <= 0:
+        manual_scheduler_locked = manual_pump_active or manual_ag_active or manual_air_active
+        if manual_scheduler_locked:
+            if (not manual_pump_active) and status_data.get("pump_state") == "ON":
+                status_data["pump_state"] = "OFF"
+                _set_main_pump(False)
+            status_data["pump_phase_end_ts"] = None if not manual_pump_active else status_data.get("pump_phase_end_ts")
+            status_data["pump_time_remaining_s"] = None
+            if not manual_ag_active:
+                status_data["agitator_phase_end_ts"] = None
+                status_data["agitator_time_remaining_s"] = None
+            if not manual_air_active:
+                status_data["air_pump_phase_end_ts"] = None
+                status_data["air_pump_time_remaining_s"] = None
+        elif pump_off <= 0 and pump_on <= 0:
             # disabled
             if status_data.get("pump_state") == "ON":
                 status_data["pump_state"] = "OFF"
@@ -1498,7 +1574,8 @@ def simulate_profile(profile_name: str, profile_data: dict):
                     status_data["air_pump_phase_end_ts"] = None
                     status_data["air_pump_time_remaining_s"] = None
 
-        # ─── Update countdowns (for UI) ───
+
+# ─── Update countdowns (for UI) ───
         if status_data.get("pump_state") == "ON":
             end_ts = status_data.get("pump_phase_end_ts")
             if isinstance(end_ts, (int, float)) and end_ts > 0:
@@ -1728,11 +1805,13 @@ app.config["CTX"] = CTX  # make available to blueprints via current_app.config["
 from web.profiles_routes import bp as profiles_bp
 from web.control_routes import bp as control_bp
 from web.system_routes import bp as system_bp
+from web.manual_routes import bp as manual_bp
 
 app.register_blueprint(system_bp)       # '/', '/status.json', '/settings/global', etc.
 app.register_blueprint(profiles_bp)     # '/profiles', '/new', '/edit/...', archive/restore/duplicate
 app.register_blueprint(control_bp)      # '/run/...', '/stop', '/pause', '/unpause', '/resume', '/dismiss-resume'
 app.register_blueprint(reservoirs_bp)   # for the reservoir management
+app.register_blueprint(manual_bp)
 
 # Scale settings + raw data API (keeps same routes as before)
 from sensors.scale_api import scale_bp

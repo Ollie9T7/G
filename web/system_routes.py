@@ -38,6 +38,9 @@ def status_json():
         "heater_state":       ONOFF(sd.get("heater_state")),
         "humidifier_state":   ONOFF(sd.get("humidifier_state")),
         "extractor_state":    ONOFF(sd.get("extractor_state", sd.get("fan_state", "OFF"))),
+        "nutrient_a_state":   ONOFF(sd.get("nutrient_A_on")),
+        "nutrient_b_state":   ONOFF(sd.get("nutrient_B_on")),
+        "concentrate_mix_state": ONOFF(sd.get("concentrate_mix_state")),
 
         "pump_time_remaining_s":      sd.get("pump_time_remaining_s"),
         "agitator_time_remaining_s":  sd.get("agitator_time_remaining_s"),
@@ -102,6 +105,15 @@ def status_json():
         payload["banner"] = compute_banner(payload)
     except Exception:
         payload["banner"] = {"level": "info", "message": "System nominal", "rotate": []}
+
+    try:
+        manual = sd.get("manual_overrides", {}) if isinstance(sd.get("manual_overrides"), dict) else {}
+        payload["manual_overrides"] = {
+            k: {kk: vv for kk, vv in (v or {}).items() if kk != "since_mono"}
+            for k, v in manual.items()
+        }
+    except Exception:
+        payload["manual_overrides"] = {}
 
     resp = make_response(jsonify(payload))
     resp.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'

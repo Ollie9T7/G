@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Manual Override</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    :root {
+      --bg: #0f172a;
+      --card: #111827;
+      --border: #1f2937;
+      --text: #e5e7eb;
+      --muted: #9ca3af;
+      --accent: #22d3ee;
+      --pill-on: #22c55e;
+      --pill-off: #ef4444;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: 'Open Sans', system-ui, -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+    }
+    header {
+      padding: 20px 24px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .title {
+      font-size: 22px;
+      font-weight: 700;
+      letter-spacing: 0.2px;
+    }
+    .subtitle {
+      color: var(--muted);
+      margin-top: 4px;
+      font-size: 14px;
+    }
+    .nav-link {
+      color: var(--accent);
+      text-decoration: none;
+      font-weight: 600;
+    }
+    .wrapper { padding: 16px 24px 32px; }
+    .banner {
+      background: #0b1220;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 12px 14px;
+      color: var(--muted);
+      margin-bottom: 18px;
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+    .card-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      gap: 14px;
+    }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.35);
+    }
+    .card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-weight: 700;
+      letter-spacing: 0.2px;
+    }
+    .pill {
+      padding: 4px 10px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.4px;
+      color: #0b111f;
+    }
+    .pill.on { background: var(--pill-on); }
+    .pill.off { background: var(--pill-off); color: #111827; }
+    .toggle {
+      position: relative;
+      width: 48px;
+      height: 26px;
+      background: #1f2937;
+      border-radius: 20px;
+      border: 1px solid var(--border);
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    .toggle::after {
+      content: '';
+      position: absolute;
+      top: 3px;
+      left: 3px;
+      width: 20px;
+      height: 20px;
+      background: #fff;
+      border-radius: 50%;
+      transition: transform 0.2s ease;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.35);
+    }
+    .toggle.on {
+      background: #0ea5e9;
+      border-color: #38bdf8;
+    }
+    .toggle.on::after { transform: translateX(22px); }
+    .card-footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      color: var(--muted);
+      font-size: 13px;
+    }
+    .status-line { color: var(--muted); font-size: 13px; }
+    .grid-item { display: flex; gap: 12px; align-items: center; }
+    .icon-box {
+      width: 38px;
+      height: 38px;
+      border-radius: 10px;
+      background: #0b1220;
+      display: grid;
+      place-items: center;
+      color: var(--accent);
+      border: 1px solid var(--border);
+    }
+    .device-name { font-weight: 700; }
+    .toggle-row { display: flex; align-items: center; gap: 10px; }
+    .muted { color: var(--muted); }
+  </style>
+</head>
+<body>
+  <header>
+    <div>
+      <div class="title">Manual Override</div>
+      <div class="subtitle">Flip any device on or off instantly, even while a profile is running.</div>
+    </div>
+    <a href="/" class="nav-link"><i class="fa-solid fa-arrow-left"></i> Back to Dashboard</a>
+  </header>
+  <div class="wrapper">
+    <div class="banner">
+      <i class="fa-solid fa-circle-info"></i>
+      <div>
+        <div id="profile-label">Profile: None running</div>
+        <div class="muted">Actions are logged as manual overrides with their runtimes.</div>
+      </div>
+    </div>
+
+    <div class="card-grid" id="card-grid"></div>
+  </div>
+
+  <script>
+    const DEVICES = [
+      { key: 'heater', label: 'Heater', icon: 'fa-fire-flame-simple' },
+      { key: 'extractor', label: 'Extractor', icon: 'fa-fan' },
+      { key: 'humidifier', label: 'Humidifier', icon: 'fa-droplet' },
+      { key: 'main_pump', label: 'Main Water Pump', icon: 'fa-faucet-drip' },
+      { key: 'agitator_pump', label: 'Agitator Pump', icon: 'fa-water' },
+      { key: 'air_pump', label: 'Air Pump', icon: 'fa-wind' },
+      { key: 'nutrient_pump_a', label: 'Nutrient Pump A', icon: 'fa-flask' },
+      { key: 'nutrient_pump_b', label: 'Nutrient Pump B', icon: 'fa-flask-vial' },
+      { key: 'nutrient_stirrer', label: 'Nutrient Stirrer', icon: 'fa-martini-glass-citrus' },
+    ];
+
+    function pillClass(state) { return state === 'ON' ? 'pill on' : 'pill off'; }
+
+    function buildCards() {
+      const grid = document.getElementById('card-grid');
+      grid.innerHTML = '';
+      DEVICES.forEach(dev => {
+        const card = document.createElement('div');
+        card.className = 'card';
+        card.innerHTML = `
+          <div class="card-header">
+            <div class="grid-item">
+              <div class="icon-box"><i class="fa-solid ${dev.icon}"></i></div>
+              <div class="device-name">${dev.label}</div>
+            </div>
+            <span class="pill off" data-pill="${dev.key}">OFF</span>
+          </div>
+          <div class="toggle-row">
+            <div class="toggle" role="switch" aria-checked="false" tabindex="0" data-toggle="${dev.key}"></div>
+            <div class="status-line" id="status-${dev.key}">Awaiting status…</div>
+          </div>
+          <div class="card-footer">
+            <span class="muted" id="since-${dev.key}"></span>
+            <span class="muted" id="duration-${dev.key}"></span>
+          </div>
+        `;
+        grid.appendChild(card);
+      });
+    }
+
+    async function fetchStatus() {
+      try {
+        const resp = await fetch('/manual/api/status', { cache: 'no-store' });
+        const data = await resp.json();
+        applyStatus(data);
+      } catch (err) {
+        console.warn('manual status error', err);
+      }
+    }
+
+    async function toggleDevice(key, on) {
+      try {
+        const resp = await fetch('/manual/api/toggle', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ device: key, on }),
+        });
+        const data = await resp.json();
+        if (data.devices) applyStatus({ devices: data.devices });
+      } catch (err) {
+        console.warn('manual toggle failed', err);
+      }
+    }
+
+    function applyStatus(payload) {
+      const profile = payload.running_profile;
+      document.getElementById('profile-label').textContent = profile ? `Profile running: ${profile}` : 'Profile: None running';
+      const devices = payload.devices || {};
+      DEVICES.forEach(dev => {
+        const info = devices[dev.key] || {};
+        const state = (info.state || 'OFF').toUpperCase();
+        const pill = document.querySelector(`[data-pill="${dev.key}"]`);
+        const toggle = document.querySelector(`[data-toggle="${dev.key}"]`);
+        const statusLine = document.getElementById(`status-${dev.key}`);
+        const since = document.getElementById(`since-${dev.key}`);
+        const duration = document.getElementById(`duration-${dev.key}`);
+        if (pill) {
+          pill.textContent = state;
+          pill.className = pillClass(state);
+        }
+        if (toggle) {
+          toggle.classList.toggle('on', state === 'ON');
+          toggle.setAttribute('aria-checked', state === 'ON');
+        }
+        if (statusLine) {
+          statusLine.textContent = info.manual_active ? 'Manual override active' : 'Manual override idle';
+        }
+        if (since) {
+          since.textContent = info.since ? `Since: ${info.since}` : '';
+        }
+        if (duration) {
+          duration.textContent = info.last_duration_s ? `Last run: ${Math.round(info.last_duration_s)}s` : '';
+        }
+      });
+    }
+
+    document.addEventListener('click', (e) => {
+      const toggleEl = e.target.closest('[data-toggle]');
+      if (!toggleEl) return;
+      const key = toggleEl.getAttribute('data-toggle');
+      const next = !toggleEl.classList.contains('on');
+      toggleEl.classList.toggle('on', next);
+      toggleEl.setAttribute('aria-checked', next);
+      toggleDevice(key, next);
+    });
+
+    document.addEventListener('keydown', (e) => {
+      const toggleEl = e.target.closest('[data-toggle]');
+      if (!toggleEl) return;
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        const key = toggleEl.getAttribute('data-toggle');
+        const next = !toggleEl.classList.contains('on');
+        toggleEl.classList.toggle('on', next);
+        toggleEl.setAttribute('aria-checked', next);
+        toggleDevice(key, next);
+      }
+    });
+
+    buildCards();
+    fetchStatus();
+    setInterval(fetchStatus, 4000);
+  </script>
+</body>
+</html>
