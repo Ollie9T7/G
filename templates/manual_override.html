@@ -25,10 +25,10 @@
       padding: 0 var(--pad);
     }
 
-    .wrap { max-width: var(--w); margin: 28px auto; padding: 0 var(--pad) 40px; }
+    .wrap { max-width: var(--w); margin: 24px auto; padding: 0 var(--pad) 36px; }
     .topbar { display:flex; gap:12px; align-items:flex-start; justify-content:space-between; margin-bottom: 12px; }
-    .title-block h1 { margin:0 0 6px 0; font-size:22px; font-weight:700; }
-    .page-description { margin:0; color:var(--hint); font-size:14px; line-height:1.5; }
+    .title-block h1 { margin:0 0 6px 0; font-size:20px; font-weight:700; }
+    .page-description { margin:0; color:var(--hint); font-size:13px; line-height:1.4; }
     .pill { padding:4px 10px; border-radius:999px; border:1px solid #2a3950; background:var(--well); color:var(--muted); font-size:12px; font-weight:700; text-transform:uppercase; letter-spacing:.02em; }
     .pill.on { color:#0c141f; background: var(--ok); border-color: #7bd88f; }
     .pill.off { color:#2b1c24; background:#f18aa1; border-color:#f18aa1; }
@@ -47,21 +47,21 @@
     }
     .banner strong { color: var(--ink); }
 
-    .card-grid { display:grid; grid-template-columns: repeat(auto-fit, minmax(360px, 1fr)); gap: var(--gap); }
+    .card-grid { display:grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 12px; }
     .card {
       background: var(--card);
       border: 1px solid var(--border);
       border-radius: var(--br);
-      padding: 16px;
+      padding: 12px;
       display: flex;
       flex-direction: column;
-      gap: 12px;
+      gap: 10px;
       box-shadow: 0 4px 14px rgba(0,0,0,0.35);
     }
     .card-head { display:flex; justify-content:space-between; align-items:center; gap:10px; }
     .device-meta { display:flex; gap:10px; align-items:center; }
-    .icon-box { width:40px; height:40px; border-radius:10px; background:var(--well2); color:var(--ink); display:grid; place-items:center; border:1px solid var(--border); }
-    .device-title { font-weight:700; letter-spacing:.2px; }
+    .icon-box { width:34px; height:34px; border-radius:9px; background:var(--well2); color:var(--ink); display:grid; place-items:center; border:1px solid var(--border); }
+    .device-title { font-weight:700; letter-spacing:.2px; font-size:14px; }
 
     .toggle-row { display:flex; align-items:center; gap:12px; }
     .toggle {
@@ -91,12 +91,23 @@
     .toggle.on::after { transform: translateX(24px); }
 
     .status-line { color: var(--hint); font-size: 13px; }
-    .card-footer { display:flex; justify-content:space-between; gap:10px; color: var(--muted); font-size:12px; }
+    .card-footer { display:flex; justify-content:flex-end; gap:10px; color: var(--muted); font-size:12px; }
     .muted { color: var(--muted); }
+    .control-row { display:flex; flex-direction:column; gap:6px; margin-top: 2px; }
+    .input-label { font-size: 11px; color: var(--hint); letter-spacing: .02em; text-transform: uppercase; }
+    .input-group { display:flex; gap:8px; align-items:center; }
+    .input { background: var(--well); border:1px solid var(--border); border-radius: 8px; padding: 7px 9px; color: var(--ink); min-width: 0; width: 100%; font-size:13px; }
+    .input:focus { outline: 2px solid #1e5cff; border-color: #1e5cff; }
+    .btn { border:none; border-radius: 8px; padding: 7px 11px; cursor:pointer; font-weight:700; font-size: 12px; letter-spacing: .01em; background:#1e5cff; color:#f2f6ff; display:inline-flex; align-items:center; gap:8px; box-shadow: 0 8px 16px rgba(30,92,255,0.25); }
+    .btn.ghost { background: transparent; color: var(--muted); border:1px solid var(--border); box-shadow: none; }
+    .btn:disabled { opacity: 0.5; cursor:not-allowed; }
+    .timer-line { font-size:12px; color: var(--muted); min-height: 16px; }
 
     @media (max-width: 720px) {
       .topbar { flex-direction: column; align-items:flex-start; }
       .card-grid { grid-template-columns: 1fr; }
+      .input-group { flex-wrap: wrap; }
+      .input { flex:1 1 120px; }
     }
   </style>
 </head>
@@ -135,11 +146,14 @@
       { key: 'nutrient_stirrer', label: 'Nutrient Stirrer', icon: 'fa-martini-glass-citrus' },
     ];
 
+    const deviceState = {};
+    const countdowns = new Map();
+
     function pillClass(state) { return state === 'ON' ? 'pill on' : 'pill off'; }
 
     function fmtDuration(sec){
       if (!sec && sec !== 0) return '';
-      const s = Math.round(sec);
+      const s = Math.max(0, Math.ceil(sec));
       if (s < 60) return `${s}s`;
       const m = Math.floor(s/60); const r = s % 60;
       return `${m}m ${r}s`;
@@ -163,8 +177,16 @@
             <div class="toggle" role="switch" aria-checked="false" tabindex="0" data-toggle="${dev.key}"></div>
             <div class="status-line" id="status-${dev.key}">Awaiting status…</div>
           </div>
+          <div class="control-row">
+            <div class="input-label">Timed run (seconds)</div>
+            <div class="input-group">
+              <input type="number" min="1" step="1" class="input" placeholder="e.g. 120" data-seconds="${dev.key}" />
+              <button class="btn" data-run="${dev.key}"><i class="fa-solid fa-play"></i><span>Run</span></button>
+              <button class="btn ghost" data-stop="${dev.key}"><i class="fa-solid fa-stop"></i><span>Stop</span></button>
+            </div>
+            <div class="timer-line" id="timer-${dev.key}"></div>
+          </div>
           <div class="card-footer">
-            <span class="muted" id="since-${dev.key}"></span>
             <span class="muted" id="duration-${dev.key}"></span>
           </div>
         `;
@@ -206,8 +228,14 @@
         const pill = document.querySelector(`[data-pill="${dev.key}"]`);
         const toggle = document.querySelector(`[data-toggle="${dev.key}"]`);
         const statusLine = document.getElementById(`status-${dev.key}`);
-        const since = document.getElementById(`since-${dev.key}`);
         const duration = document.getElementById(`duration-${dev.key}`);
+
+        deviceState[dev.key] = { ...info };
+        if (info.manual_active && info.run_remaining_s != null) {
+          countdowns.set(dev.key, Date.now() + info.run_remaining_s * 1000);
+        } else {
+          countdowns.delete(dev.key);
+        }
         if (pill) {
           pill.textContent = state;
           pill.className = pillClass(state);
@@ -219,12 +247,42 @@
         if (statusLine) {
           statusLine.textContent = info.manual_active ? 'Manual override active' : 'Automation in control';
         }
-        if (since) {
-          since.textContent = info.since ? `Since: ${info.since}` : '';
-        }
         if (duration) {
           duration.textContent = info.last_duration_s != null ? `Last run: ${fmtDuration(info.last_duration_s)}` : '';
         }
+      });
+
+      updateTimerLines();
+    }
+
+    function updateTimerLines() {
+      DEVICES.forEach(dev => {
+        const timerText = document.getElementById(`timer-${dev.key}`);
+        if (!timerText) return;
+        const info = deviceState[dev.key] || {};
+        const end = countdowns.get(dev.key);
+        let remaining = null;
+
+        if (end) {
+          remaining = Math.max(0, (end - Date.now()) / 1000);
+          if (remaining <= 0) {
+            countdowns.delete(dev.key);
+            info.run_remaining_s = 0;
+          }
+        } else if (info.manual_active && info.run_remaining_s != null) {
+          remaining = Math.max(0, info.run_remaining_s);
+        }
+
+        let text = '';
+        if (remaining != null && remaining > 0) {
+          text = `Timer: ${fmtDuration(remaining)} remaining`;
+        } else if (info.manual_active && remaining === 0) {
+          text = 'Timer completed';
+        } else if (info.run_seconds) {
+          text = `Last timer: ${fmtDuration(info.run_seconds)}`;
+        }
+
+        timerText.textContent = text;
       });
     }
 
@@ -236,6 +294,25 @@
       toggleEl.classList.toggle('on', next);
       toggleEl.setAttribute('aria-checked', next);
       toggleDevice(key, next);
+    });
+
+    document.addEventListener('click', (e) => {
+      const runBtn = e.target.closest('[data-run]');
+      const stopBtn = e.target.closest('[data-stop]');
+      if (runBtn) {
+        const key = runBtn.getAttribute('data-run');
+        const input = document.querySelector(`[data-seconds="${key}"]`);
+        const seconds = parseFloat(input?.value || '0');
+        if (!seconds || seconds <= 0) {
+          input?.focus();
+          return;
+        }
+        runForSeconds(key, seconds);
+      }
+      if (stopBtn) {
+        const key = stopBtn.getAttribute('data-stop');
+        stopDevice(key);
+      }
     });
 
     document.addEventListener('keydown', (e) => {
@@ -251,9 +328,38 @@
       }
     });
 
+    async function runForSeconds(key, seconds) {
+      try {
+        const resp = await fetch('/manual/api/run_for', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ device: key, seconds }),
+        });
+        const data = await resp.json();
+        if (data.devices) applyStatus({ devices: data.devices });
+      } catch (err) {
+        console.warn('manual timed run failed', err);
+      }
+    }
+
+    async function stopDevice(key) {
+      try {
+        const resp = await fetch('/manual/api/stop', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ device: key }),
+        });
+        const data = await resp.json();
+        if (data.devices) applyStatus({ devices: data.devices });
+      } catch (err) {
+        console.warn('manual stop failed', err);
+      }
+    }
+
     buildCards();
     fetchStatus();
     setInterval(fetchStatus, 4000);
+    setInterval(updateTimerLines, 300);
   </script>
 </body>
 </html>

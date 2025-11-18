@@ -1,4 +1,7 @@
 import datetime
+import threading
+import time
+import uuid
 from time import monotonic as _mono
 
 from flask import Blueprint, current_app, jsonify, render_template, request
@@ -138,10 +141,21 @@ def _apply_toggle(device_key: str, turn_on: bool):
                 since_mono=entry.get("since_mono") or now_m,
                 since_iso=entry.get("since_iso") or datetime.datetime.utcnow().isoformat() + "Z",
                 last_duration_s=None,
+                run_seconds=None,
+                run_until_mono=None,
+                timer_token=None,
             )
             _log_manual(device_key, "ON", None)
         else:
-            entry.update(active=False, state="OFF", since_mono=None, since_iso=None)
+            entry.update(
+                active=False,
+                state="OFF",
+                since_mono=None,
+                since_iso=None,
+                run_seconds=None,
+                run_until_mono=None,
+                timer_token=None,
+            )
             _log_manual(device_key, "OFF", None)
         return
 
@@ -159,6 +173,9 @@ def _apply_toggle(device_key: str, turn_on: bool):
             since_mono=now_m,
             since_iso=datetime.datetime.utcnow().isoformat() + "Z",
             last_duration_s=None,
+            run_seconds=None,
+            run_until_mono=None,
+            timer_token=None,
         )
         _log_manual(device_key, "ON", None)
     else:
@@ -169,16 +186,59 @@ def _apply_toggle(device_key: str, turn_on: bool):
                 duration = max(0.0, float(now_m) - float(since))
         except Exception:
             duration = None
-        entry.update(active=False, state="OFF", last_duration_s=duration, since_mono=None, since_iso=None)
+        entry.update(
+            active=False,
+            state="OFF",
+            last_duration_s=duration,
+            since_mono=None,
+            since_iso=None,
+            run_seconds=None,
+            run_until_mono=None,
+            timer_token=None,
+        )
         _log_manual(device_key, "OFF", duration)
 
 
+def _expire_manual_if_due(device_key: str):
+    """If a timed manual run has elapsed, clear the override immediately.
+
+    This keeps automation in control when a timer has finished even if the
+    background timer thread was interrupted or UI polling is infrequent.
+    """
+
+    entry = _manual_overrides().get(device_key, {})
+    if not entry.get("active"):
+        return
+
+    try:
+        run_until = entry.get("run_until_mono")
+        if run_until is None:
+            return
+        if float(run_until) > float(_mono()):
+            return
+    except Exception:
+        return
+
+    # Timer elapsed — turn the device off and clear the manual flags so
+    # automation can resume control.
+    _apply_toggle(device_key, False)
+    entry.update(run_seconds=None, run_until_mono=None, run_until_iso=None, timer_token=None)
+
+
 def _device_snapshot(device_key: str):
+    _expire_manual_if_due(device_key)
     sd = status_data()
     device = MANUAL_DEVICES[device_key]
     state_key = device.get("state_key")
     manual_entry = _manual_overrides().get(device_key, {})
     state_val = sd.get(state_key) if state_key else False
+    run_until = manual_entry.get("run_until_mono")
+    run_remaining = None
+    try:
+        if run_until:
+            run_remaining = max(0.0, float(run_until) - float(_mono()))
+    except Exception:
+        run_remaining = None
     return {
         "key": device_key,
         "label": device.get("label", device_key),
@@ -186,7 +246,24 @@ def _device_snapshot(device_key: str):
         "manual_active": bool(manual_entry.get("active")),
         "since": manual_entry.get("since_iso"),
         "last_duration_s": manual_entry.get("last_duration_s"),
+        "run_seconds": manual_entry.get("run_seconds"),
+        "run_until": manual_entry.get("run_until_iso"),
+        "run_remaining_s": run_remaining,
     }
+
+
+def _schedule_off_timer(app, device_key: str, token: str, seconds: float):
+    def _worker():
+        with app.app_context():
+            time.sleep(max(0.0, seconds))
+            entry = _manual_overrides().get(device_key, {})
+            if entry.get("timer_token") != token:
+                return
+            if str(entry.get("state", "OFF")).upper() != "ON":
+                return
+            _apply_toggle(device_key, False)
+
+    threading.Thread(target=_worker, daemon=True).start()
 
 
 @bp.route("/manual")
@@ -213,4 +290,52 @@ def manual_toggle():
         return jsonify({"ok": False, "error": "Unknown device"}), 400
 
     _apply_toggle(device_key, turn_on)
+    return jsonify({"ok": True, "devices": {_k: _device_snapshot(_k) for _k in MANUAL_DEVICES}})
+
+
+@bp.route("/manual/api/run_for", methods=["POST"])
+def manual_run_for():
+    data = request.get_json(silent=True) or {}
+    device_key = data.get("device")
+    seconds = data.get("seconds")
+    try:
+        seconds = float(seconds)
+    except Exception:
+        seconds = 0
+
+    if device_key not in MANUAL_DEVICES:
+        return jsonify({"ok": False, "error": "Unknown device"}), 400
+    if seconds <= 0:
+        return jsonify({"ok": False, "error": "Seconds must be greater than zero"}), 400
+
+    app = current_app._get_current_object()
+    _apply_toggle(device_key, True)
+
+    manual = _manual_overrides()
+    entry = manual.setdefault(device_key, {})
+    now_m = _mono()
+    token = uuid.uuid4().hex
+    entry.update(
+        run_seconds=seconds,
+        run_until_mono=now_m + seconds,
+        run_until_iso=(datetime.datetime.utcnow() + datetime.timedelta(seconds=seconds)).isoformat() + "Z",
+        timer_token=token,
+    )
+
+    _schedule_off_timer(app, device_key, token, seconds)
+
+    return jsonify({"ok": True, "devices": {_k: _device_snapshot(_k) for _k in MANUAL_DEVICES}})
+
+
+@bp.route("/manual/api/stop", methods=["POST"])
+def manual_stop():
+    data = request.get_json(silent=True) or {}
+    device_key = data.get("device")
+    if device_key not in MANUAL_DEVICES:
+        return jsonify({"ok": False, "error": "Unknown device"}), 400
+
+    entry = _manual_overrides().setdefault(device_key, {})
+    entry.update(run_seconds=None, run_until_mono=None, run_until_iso=None, timer_token=None)
+    _apply_toggle(device_key, False)
+
     return jsonify({"ok": True, "devices": {_k: _device_snapshot(_k) for _k in MANUAL_DEVICES}})
