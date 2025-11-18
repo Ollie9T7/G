@@ -1111,12 +1111,6 @@ function updateSensors(d){
   function wireControls() {
     wireAjaxForm('ap-form-pause');
     wireAjaxForm('ap-form-unpause');
-    const manualBtn = document.getElementById('lss-manual');
-    if (manualBtn) {
-      manualBtn.addEventListener('click', () => {
-        window.location.href = '/manual';
-      });
-    }
   }
 
   // --- Poller ---
