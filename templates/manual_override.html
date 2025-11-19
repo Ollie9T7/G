@@ -91,7 +91,6 @@
     .toggle.on::after { transform: translateX(24px); }
 
     .status-line { color: var(--hint); font-size: 13px; }
-    .card-footer { display:flex; justify-content:flex-end; gap:10px; color: var(--muted); font-size:12px; }
     .muted { color: var(--muted); }
     .control-row { display:flex; flex-direction:column; gap:6px; margin-top: 2px; }
     .input-label { font-size: 11px; color: var(--hint); letter-spacing: .02em; text-transform: uppercase; }
@@ -100,6 +99,9 @@
     .input:focus { outline: 2px solid #1e5cff; border-color: #1e5cff; }
     .btn { border:none; border-radius: 8px; padding: 7px 11px; cursor:pointer; font-weight:700; font-size: 12px; letter-spacing: .01em; background:#1e5cff; color:#f2f6ff; display:inline-flex; align-items:center; gap:8px; box-shadow: 0 8px 16px rgba(30,92,255,0.25); }
     .btn.ghost { background: transparent; color: var(--muted); border:1px solid var(--border); box-shadow: none; }
+    .btn.danger { background: var(--bad); color:#2b1c24; border:1px solid #ff9a9a; box-shadow: 0 8px 16px rgba(255,123,123,0.3); }
+    .stop-btn { display: none; }
+    .stop-btn.visible { display: inline-flex; }
     .btn:disabled { opacity: 0.5; cursor:not-allowed; }
     .timer-line { font-size:12px; color: var(--muted); min-height: 16px; }
 
@@ -178,16 +180,13 @@
             <div class="status-line" id="status-${dev.key}">Awaiting status…</div>
           </div>
           <div class="control-row">
-            <div class="input-label">Timed run (seconds)</div>
+            <div class="input-label" id="timer-label-${dev.key}">Timer: waiting</div>
             <div class="input-group">
-              <input type="number" min="1" step="1" class="input" placeholder="e.g. 120" data-seconds="${dev.key}" />
+              <input type="number" min="1" step="1" class="input" placeholder="Run for x seconds" data-seconds="${dev.key}" />
               <button class="btn" data-run="${dev.key}"><i class="fa-solid fa-play"></i><span>Run</span></button>
-              <button class="btn ghost" data-stop="${dev.key}"><i class="fa-solid fa-stop"></i><span>Stop</span></button>
+              <button class="btn stop-btn" data-stop="${dev.key}"><i class="fa-solid fa-stop"></i><span>Stop</span></button>
             </div>
             <div class="timer-line" id="timer-${dev.key}"></div>
-          </div>
-          <div class="card-footer">
-            <span class="muted" id="duration-${dev.key}"></span>
           </div>
         `;
         grid.appendChild(card);
@@ -228,7 +227,6 @@
         const pill = document.querySelector(`[data-pill="${dev.key}"]`);
         const toggle = document.querySelector(`[data-toggle="${dev.key}"]`);
         const statusLine = document.getElementById(`status-${dev.key}`);
-        const duration = document.getElementById(`duration-${dev.key}`);
 
         deviceState[dev.key] = { ...info };
         if (info.manual_active && info.run_remaining_s != null) {
@@ -247,9 +245,6 @@
         if (statusLine) {
           statusLine.textContent = info.manual_active ? 'Manual override active' : 'Automation in control';
         }
-        if (duration) {
-          duration.textContent = info.last_duration_s != null ? `Last run: ${fmtDuration(info.last_duration_s)}` : '';
-        }
       });
 
       updateTimerLines();
@@ -258,7 +253,8 @@
     function updateTimerLines() {
       DEVICES.forEach(dev => {
         const timerText = document.getElementById(`timer-${dev.key}`);
-        if (!timerText) return;
+        const timerLabel = document.getElementById(`timer-label-${dev.key}`);
+        const stopBtn = document.querySelector(`[data-stop="${dev.key}"]`);
         const info = deviceState[dev.key] || {};
         const end = countdowns.get(dev.key);
         let remaining = null;
@@ -273,16 +269,25 @@
           remaining = Math.max(0, info.run_remaining_s);
         }
 
-        let text = '';
-        if (remaining != null && remaining > 0) {
-          text = `Timer: ${fmtDuration(remaining)} remaining`;
+        const hasCountdown = remaining != null && remaining > 0;
+        let labelText = 'Timer: waiting';
+        let subText = '';
+
+        if (hasCountdown) {
+          labelText = `Timer: ${fmtDuration(remaining)}`;
+          subText = 'Counting down';
         } else if (info.manual_active && remaining === 0) {
-          text = 'Timer completed';
+          labelText = 'Timer completed';
         } else if (info.run_seconds) {
-          text = `Last timer: ${fmtDuration(info.run_seconds)}`;
+          subText = `Last timer: ${fmtDuration(info.run_seconds)}`;
         }
 
-        timerText.textContent = text;
+        if (timerLabel) timerLabel.textContent = labelText;
+        if (timerText) timerText.textContent = subText;
+        if (stopBtn) {
+          stopBtn.classList.toggle('visible', hasCountdown);
+          stopBtn.classList.toggle('danger', hasCountdown);
+        }
       });
     }
 
