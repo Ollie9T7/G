@@ -82,6 +82,12 @@ def status_json():
         "reservoir_water_kg":  sd.get("reservoir_water_kg"),
         "reservoir_status":    sd.get("reservoir_status"),
         "reservoir_debug":     sd.get("reservoir_debug"),
+        "humid_res_gross_kg":  sd.get("humid_res_gross_kg"),
+        "humid_res_water_raw": sd.get("humid_res_water_raw"),
+        "humid_res_water_kg":  sd.get("humid_res_water_kg"),
+        "humid_reservoir_water_kg": sd.get("humid_reservoir_water_kg"),
+        "humid_res_status":    sd.get("humid_res_status"),
+        "humid_res_debug":     sd.get("humid_res_debug"),
     })
     payload["water_quantity"] = (
         payload["reservoir_water_kg"]

@@ -51,6 +51,16 @@ DEFAULTS = {
     "reservoir_empty_weight_kg": 5.0,      # tank + fittings with no water
     "reservoir_full_capacity_kg": 60.0,    # ★ NET water at your chosen "full" line
 
+    # Humidifier reservoir (kg)
+    "humid_res_empty_weight_kg": 1.0,
+    "humid_res_full_capacity_kg": 5.0,
+
+    # Humidifier thresholds (kg of water; referenced to empty)
+    "humid_res_half_water_kg": 2.5,
+    "humid_res_low_water_kg": 1.2,
+    "humid_res_critical_water_kg": 0.5,
+    "humid_res_full_margin_kg": 0.3,
+
     # Thresholds are kg of water (net, referenced to empty)
     "reservoir_half_water_kg": 30.0,
     "reservoir_low_water_kg": 15.0,
@@ -88,6 +98,19 @@ def full_gross_weight_kg(s: dict) -> float:
 def water_kg_from_gross(gross_kg: float, s: dict) -> float:
     """Convert gross scale reading to net water kg above empty."""
     return max(0.0, float(gross_kg) - float(s.get("reservoir_empty_weight_kg", 0.0)))
+
+
+# Humidifier helpers (mirror the main reservoir helpers but use humid_res_* keys)
+def humid_usable_capacity_kg(s: dict) -> float:
+    return max(0.0, float(s.get("humid_res_full_capacity_kg", 0.0)))
+
+
+def humid_full_gross_weight_kg(s: dict) -> float:
+    return float(s.get("humid_res_empty_weight_kg", 0.0)) + humid_usable_capacity_kg(s)
+
+
+def humid_water_kg_from_gross(gross_kg: float, s: dict) -> float:
+    return max(0.0, float(gross_kg) - float(s.get("humid_res_empty_weight_kg", 0.0)))
 
 # --------------------------------------------------------------------
 
@@ -153,6 +176,7 @@ def save_global_settings(data: dict):
 
         # ★ Back-compat mirror: always write derived 'reservoir_full_weight_kg'
         _CACHE["reservoir_full_weight_kg"] = full_gross_weight_kg(_CACHE)
+        _CACHE["humid_res_full_weight_kg"] = humid_full_gross_weight_kg(_CACHE)
 
         payload = json.dumps(_CACHE, indent=2, sort_keys=True)
         if os.path.exists(GLOBALS_PATH):
@@ -237,6 +261,16 @@ def validate_settings(raw: dict):
     as_float("reservoir_pump_cutoff_water_kg", lo=0, hi=100000)
     as_float("reservoir_full_margin_kg",     lo=0, hi=10000)
 
+    # Humidifier reservoir (capacity-based)
+    as_float("humid_res_empty_weight_kg",   lo=0, hi=10000)
+    as_float("humid_res_full_capacity_kg",  lo=0, hi=100000)
+
+    # Humidifier thresholds
+    as_float("humid_res_half_water_kg",     lo=0, hi=100000)
+    as_float("humid_res_low_water_kg",      lo=0, hi=100000)
+    as_float("humid_res_critical_water_kg", lo=0, hi=100000)
+    as_float("humid_res_full_margin_kg",    lo=0, hi=10000)
+
     # Premix (NO LEADS)
     as_bool("agitator_enabled")
     as_int("agitator_run_sec",  lo=0, hi=3600, required=False)
@@ -283,6 +317,26 @@ def validate_settings(raw: dict):
             errors.append("reservoir_critical_water_kg must be ≤ reservoir_low_water_kg")
         if c is not None and d is not None and c > d:
             errors.append("reservoir_low_water_kg must be ≤ reservoir_half_water_kg")
+
+    hcap = cleaned.get("humid_res_full_capacity_kg")
+    if hcap is not None:
+        if hcap <= 0:
+            errors.append("humid_res_full_capacity_kg must be > 0")
+        for key in (
+            "humid_res_half_water_kg",
+            "humid_res_low_water_kg",
+            "humid_res_critical_water_kg",
+        ):
+            if key in cleaned and cleaned[key] > hcap:
+                errors.append(f"{key} cannot exceed usable water ({hcap} kg)")
+
+        h_half = cleaned.get("humid_res_half_water_kg")
+        h_low  = cleaned.get("humid_res_low_water_kg")
+        h_crit = cleaned.get("humid_res_critical_water_kg")
+        if h_crit is not None and h_low is not None and h_crit > h_low:
+            errors.append("humid_res_critical_water_kg must be ≤ humid_res_low_water_kg")
+        if h_low is not None and h_half is not None and h_low > h_half:
+            errors.append("humid_res_low_water_kg must be ≤ humid_res_half_water_kg")
 
         # Full margin sanity
         if "reservoir_full_margin_kg" in cleaned and cleaned["reservoir_full_margin_kg"] > cap:

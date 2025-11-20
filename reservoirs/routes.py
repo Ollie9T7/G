@@ -18,7 +18,13 @@ from __future__ import annotations
 from flask import current_app, render_template, request, jsonify, session, redirect, url_for
 from reservoirs import reservoirs_bp
 # NEW: capacity/gross helpers from global settings
-from global_settings import usable_capacity_kg, full_gross_weight_kg, water_kg_from_gross
+from global_settings import (
+    usable_capacity_kg,
+    full_gross_weight_kg,
+    water_kg_from_gross,
+    humid_usable_capacity_kg,
+    humid_water_kg_from_gross,
+)
 import time  # <-- ADDED (used by /api/reservoirs/dose)
 import threading
 from reservoirs.persistence import save_last_fill_iso
@@ -283,6 +289,24 @@ def _read_water_kg_from_scale(ctx: dict, gs: dict):
         return None
 
 
+def _read_humid_water_kg_from_scale(ctx: dict, gs: dict):
+    try:
+        from sensors.scale import read_humid_reservoir_kg  # type: ignore
+    except Exception:
+        return None
+
+    try:
+        empty = float(gs.get("humid_res_empty_weight_kg", 0.0) or 0.0)
+    except Exception:
+        empty = 0.0
+
+    try:
+        water, gross = read_humid_reservoir_kg(empty_kg=empty)
+        return water
+    except Exception:
+        return None
+
+
 def _compute_main_res_status():
     """
     Returns a dict with:
@@ -396,6 +420,63 @@ def _compute_main_res_status():
     }
 
 
+def _compute_humid_res_status():
+    ctx = _CTX()
+    gs  = ctx["load_global_settings"]()
+    sd  = ctx["status_data"]
+
+    water_kg = sd.get("humid_res_water_kg")
+    if water_kg is None:
+        water_kg = sd.get("humid_reservoir_water_kg")
+
+    if water_kg is None:
+        sampler = ctx.get("SCALE_SAMPLER")
+        if sampler:
+            try:
+                gross_kg = sampler.value_humid()
+            except Exception:
+                gross_kg = None
+            if gross_kg is not None:
+                try:
+                    water_kg = humid_water_kg_from_gross(float(gross_kg), gs)
+                except Exception:
+                    water_kg = None
+
+    if water_kg is None:
+        water_kg = _read_humid_water_kg_from_scale(ctx, gs)
+
+    usable_kg = humid_usable_capacity_kg(gs)
+    empty_gross = float(gs.get("humid_res_empty_weight_kg", 0.0) or 0.0)
+    gross_kg = None if water_kg is None else empty_gross + float(water_kg)
+
+    if water_kg is None:
+        percent = None
+        litres_to_go = None
+        fine = None
+    else:
+        if usable_kg > 0:
+            pct = max(0.0, min(100.0, (float(water_kg) / usable_kg) * 100.0))
+            percent = round(pct, 1)
+        else:
+            percent = None
+        litres_to_go = None if usable_kg <= 0 else round(max(0.0, usable_kg - float(water_kg)), 2)
+        fine = None
+
+    return {
+        "percent": percent,
+        "litres_to_go": litres_to_go,
+        "fine": fine,
+        "last_fill": None,
+        "profile_running": sd.get("profile"),
+        "water_temp_c": None,
+        "water_kg": (None if water_kg is None else round(float(water_kg), 3)),
+        "target_litres": None,
+        "is_critical": False,
+        "critical_threshold_kg": None,
+        "gross_kg": gross_kg,
+    }
+
+
 
 
 
@@ -498,16 +579,7 @@ def api_reservoirs_live():
         "dosing_phase_started_at": sd.get("dosing_phase_started_at"),  # epoch seconds
     })
 
-
-    # If you later add a second scale for the humidifier reservoir, fill this similarly.
-    humidifier = {
-        "percent": None,
-        "litres_to_go": None,
-        "fine": None,
-        "last_fill": None,
-        "profile_running": None,
-        "water_temp_c": None,
-    }
+    humidifier = _compute_humid_res_status()
 
     resp = jsonify({"main": main, "humidifier": humidifier})
     # prevent any caching so the UI always sees the latest running/cancel flags

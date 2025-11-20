@@ -11,15 +11,25 @@ except Exception as e:
 # Where the calibration is stored
 CONFIG_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "config")
 CAL_PATH = os.path.join(CONFIG_DIR, "scale_cal.json")
+HUMID_CAL_PATH = os.path.join(CONFIG_DIR, "humid_res_scale_cal.json")
+
+# BCM pins for the HX711 boards
+MAIN_DT_PIN  = 16
+MAIN_SCK_PIN = 12
+
+# Humidifier reservoir HX711 pins
+HUMID_DT_PIN  = 13
+HUMID_SCK_PIN = 19
 
 
-# Shared lock so HX711 access is serialized
+# Shared locks so HX711 access is serialized
 _SCALE_LOCK = threading.RLock()
+_HUMID_SCALE_LOCK = threading.RLock()
 
-def _load_scale_cal():
+def _load_scale_cal(path: str = CAL_PATH):
     """Return calibration dict or None if missing/invalid."""
     try:
-        with open(CAL_PATH, "r") as f:
+        with open(path, "r") as f:
             cal = json.load(f)
         # minimal sanity
         _ = float(cal["baseline_counts"])
@@ -29,15 +39,18 @@ def _load_scale_cal():
     except Exception:
         return None
 
-def _open_hx():
+def _load_humid_scale_cal():
+    return _load_scale_cal(HUMID_CAL_PATH)
+
+def _open_hx(dt_pin: int | None = None, sck_pin: int | None = None):
     """
     Open and return an HX711 instance (BCM pin numbers).
     You can hardcode the pins here or read them from calibration if you stored them.
     """
     # Default pins (match your calibrate_hx711.py)
-    DT_PIN  = 16  # BCM
-    SCK_PIN = 12  # BCM
-    hx = HX711(dout_pin=DT_PIN, pd_sck_pin=SCK_PIN, channel="A", gain=128)
+    dt = MAIN_DT_PIN if dt_pin is None else dt_pin
+    sck = MAIN_SCK_PIN if sck_pin is None else sck_pin
+    hx = HX711(dout_pin=dt, pd_sck_pin=sck, channel="A", gain=128)
     hx.reset()
     return hx
 
@@ -63,13 +76,14 @@ def _read_counts_n(hx, n=15):
     raise RuntimeError("HX711 library missing raw read methods")
 
 
-def _scale_read_counts(n=8):
+def _scale_read_counts_for_pins(dt_pin: int, sck_pin: int, n=8, lock=None):
     """
     Thread-safe median of raw counts from HX711.
     Opens a device, reads, and returns the median.
     """
-    with _SCALE_LOCK:
-        hx = _open_hx()
+    lock_obj = lock or _SCALE_LOCK
+    with lock_obj:
+        hx = _open_hx(dt_pin=dt_pin, sck_pin=sck_pin)
         try:
             return _read_counts_n(hx, n=n)
         finally:
@@ -81,6 +95,41 @@ def _scale_read_counts(n=8):
     # Do NOT call GPIO.cleanup() here; it can interfere with other devices.
 
 
+def _scale_read_counts(n=8):
+    return _scale_read_counts_for_pins(MAIN_DT_PIN, MAIN_SCK_PIN, n=n, lock=_SCALE_LOCK)
+
+
+def _scale_read_counts_humid(n=8):
+    return _scale_read_counts_for_pins(HUMID_DT_PIN, HUMID_SCK_PIN, n=n, lock=_HUMID_SCALE_LOCK)
+
+
+
+
+def _read_scale_kg(*, cal_loader, reader, empty_kg: float = 0.0):
+    try:
+        cal = cal_loader()
+        if not cal:
+            return (None, None)
+
+        baseline = float(cal["baseline_counts"])
+        cpp      = float(cal["counts_per_kg"])
+        empty    = float(cal.get("label_empty_kg", empty_kg))
+
+        if cpp == 0:
+            return (None, None)
+
+        counts = reader()
+        if counts is None:
+            return (None, None)
+
+        water_kg = (float(counts) - baseline) / cpp
+        water_kg = max(0.0, water_kg)
+
+        gross_kg = water_kg + empty
+
+        return (round(water_kg, 2), round(gross_kg, 2))
+    except Exception:
+        return (None, None)
 
 
 def read_reservoir_kg():
@@ -100,30 +149,20 @@ def read_reservoir_kg():
       - water_kg is clamped to >= 0.0
       - We read a small median sample (n=6) to reduce noise
     """
-    try:
-        cal = _load_scale_cal()
-        if not cal:
-            return (None, None)
+    return _read_scale_kg(
+        cal_loader=_load_scale_cal,
+        reader=lambda: _scale_read_counts(n=6),
+        empty_kg=0.0,
+    )
 
-        baseline = float(cal["baseline_counts"])
-        cpp      = float(cal["counts_per_kg"])
-        empty_kg = float(cal.get("label_empty_kg", 0.0))
 
-        if cpp == 0:
-            return (None, None)
-
-        counts = _scale_read_counts(n=6)
-        if counts is None:
-            return (None, None)
-
-        water_kg = (float(counts) - baseline) / cpp
-        water_kg = max(0.0, water_kg)
-
-        gross_kg = water_kg + empty_kg
-
-        return (round(water_kg, 2), round(gross_kg, 2))
-    except Exception:
-        return (None, None)
+def read_humid_reservoir_kg(empty_kg: float = 0.0):
+    """Same as read_reservoir_kg but using the humidifier HX711 + calibration."""
+    return _read_scale_kg(
+        cal_loader=_load_humid_scale_cal,
+        reader=lambda: _scale_read_counts_humid(n=6),
+        empty_kg=empty_kg,
+    )
 
 
 

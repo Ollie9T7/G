@@ -158,6 +158,12 @@ status_data = {
 
     # Reservoir exposure
     "reservoir_status": None,
+    "humid_res_gross_kg": None,
+    "humid_res_water_raw": None,
+    "humid_res_water_kg": None,
+    "humid_reservoir_water_kg": None,
+    "humid_res_status": None,
+    "humid_res_debug": None,
     "reservoir_weight_kg": None,
     "reservoir_water_kg": None,
     "pump_cycle_res_before_kg": None,
@@ -238,6 +244,22 @@ except Exception:
     pass
 
 # ───────────────────── Background: Scale Sampler ──────────────────────────
+
+def _humid_tracker_settings(gs: dict) -> dict:
+    empty = float(gs.get("humid_res_empty_weight_kg", 0.0) or 0.0)
+    usable = float(gs.get("humid_res_full_capacity_kg", 0.0) or 0.0)
+    full = empty + usable
+    return {
+        "reservoir_empty_weight_kg": empty,
+        "reservoir_full_weight_kg": full,
+        "reservoir_half_water_kg": float(gs.get("humid_res_half_water_kg", 0.0) or 0.0),
+        "reservoir_low_water_kg": float(gs.get("humid_res_low_water_kg", 0.0) or 0.0),
+        "reservoir_critical_water_kg": float(gs.get("humid_res_critical_water_kg", 0.0) or 0.0),
+        "reservoir_pump_cutoff_water_kg": 0.0,
+        "reservoir_full_margin_kg": float(gs.get("humid_res_full_margin_kg", 0.0) or 0.0),
+    }
+
+
 class _ScaleSampler:
     """
     Lightweight HX711 sampler providing a thread-safe gross reservoir kg value.
@@ -247,6 +269,7 @@ class _ScaleSampler:
         self.period_s = float(period_s)
         self.n = int(n)
         self._val = None
+        self._humid_val = None
         self._lock = threading.Lock()
         self._t = None
         self._stop = threading.Event()
@@ -267,8 +290,19 @@ class _ScaleSampler:
         with self._lock:
             return self._val
 
+    def value_humid(self):
+        with self._lock:
+            return self._humid_val
+
     def _run(self):
-        from sensors.scale import _SCALE_LOCK, _scale_read_counts, _load_scale_cal
+        from sensors.scale import (
+            _SCALE_LOCK,
+            _HUMID_SCALE_LOCK,
+            _scale_read_counts,
+            _scale_read_counts_humid,
+            _load_scale_cal,
+            _load_humid_scale_cal,
+        )
         from global_settings import load_global_settings
 
         while not self._stop.is_set():
@@ -288,6 +322,22 @@ class _ScaleSampler:
                             self._val = gross_kg
             except Exception:
                 pass
+            try:
+                hcal = _load_humid_scale_cal()
+                if hcal:
+                    with _HUMID_SCALE_LOCK:
+                        hcounts = _scale_read_counts_humid(self.n)
+                    if hcounts is not None:
+                        hwater_kg = (hcounts - hcal["baseline_counts"]) / hcal["counts_per_kg"]
+                        if hwater_kg < 0:
+                            hwater_kg = 0.0
+                        hgs = load_global_settings()
+                        hempty = float(hgs.get("humid_res_empty_weight_kg", 0.0) or 0.0)
+                        hgross_kg = hempty + hwater_kg
+                        with self._lock:
+                            self._humid_val = hgross_kg
+            except Exception:
+                pass
             self._stop.wait(self.period_s)
 
 # Global sampler instance
@@ -304,6 +354,7 @@ class _AmbientSampler:
         self._stop = threading.Event()
         # NEW: persistent reservoir tracker for smoothing while idle
         self._rt = ReservoirTracker(tau_s=8.0, snap_delta_kg=0.25, water_quant_kg=0.0, hyst_kg=0.5)
+        self._humid_rt = ReservoirTracker(tau_s=8.0, snap_delta_kg=0.25, water_quant_kg=0.0, hyst_kg=0.5)
 
     def start(self):
         if self._t and self._t.is_alive():
@@ -389,6 +440,31 @@ class _AmbientSampler:
                             reservoir_water_kg=None,
                             reservoir_status=None,
                             reservoir_debug=None
+                        )
+
+                    humid_gross = SCALE_SAMPLER.value_humid()
+                    if humid_gross is not None:
+                        hgs = _humid_tracker_settings(gs)
+                        hinfo = self._humid_rt.update(
+                            humid_gross,
+                            hgs,
+                            pump_on=False,
+                            now_wall_s=time.time(),
+                        )
+                        status_data["humid_res_gross_kg"] = hinfo.get("gross_kg")
+                        status_data["humid_res_water_raw"] = hinfo.get("water_raw")
+                        status_data["humid_res_water_kg"] = hinfo.get("water_kg")
+                        status_data["humid_reservoir_water_kg"] = hinfo.get("water_kg")
+                        status_data["humid_res_status"] = hinfo.get("status_label")
+                        status_data["humid_res_debug"] = hinfo.get("debug")
+                    else:
+                        status_data.update(
+                            humid_res_gross_kg=None,
+                            humid_res_water_raw=None,
+                            humid_res_water_kg=None,
+                            humid_reservoir_water_kg=None,
+                            humid_res_status=None,
+                            humid_res_debug=None,
                         )
             except Exception:
                 # Never crash the sampler loop
@@ -766,6 +842,7 @@ def simulate_profile(profile_name: str, profile_data: dict):
 
     # Reservoir evaluation helper
     tracker = ReservoirTracker(tau_s=8.0, snap_delta_kg=0.25, water_quant_kg=0.0, hyst_kg=0.5)
+    humid_tracker = ReservoirTracker(tau_s=8.0, snap_delta_kg=0.25, water_quant_kg=0.0, hyst_kg=0.5)
     CUTOFF_DEBOUNCE_S = 20
     cutoff_below_since = None
     reservoir_cutoff_alerted = False
@@ -1046,6 +1123,30 @@ def simulate_profile(profile_name: str, profile_data: dict):
                         reservoir_status=None,
                         reservoir_debug=None,
                     )
+
+                try:
+                    humid_gross = SCALE_SAMPLER.value_humid()
+                    hinfo = humid_tracker.update(
+                        humid_gross,
+                        _humid_tracker_settings(gs),
+                        pump_on=False,
+                        now_wall_s=time.time(),
+                    )
+                    status_data["humid_res_gross_kg"] = hinfo.get("gross_kg")
+                    status_data["humid_res_water_raw"] = hinfo.get("water_raw")
+                    status_data["humid_res_water_kg"] = hinfo.get("water_kg")
+                    status_data["humid_reservoir_water_kg"] = hinfo.get("water_kg")
+                    status_data["humid_res_status"] = hinfo.get("status_label")
+                    status_data["humid_res_debug"] = hinfo.get("debug")
+                except Exception:
+                    status_data.update(
+                        humid_res_gross_kg=None,
+                        humid_res_water_raw=None,
+                        humid_res_water_kg=None,
+                        humid_reservoir_water_kg=None,
+                        humid_res_status=None,
+                        humid_res_debug=None,
+                    )
             except Exception:
                 # Never let a UI refresh failure break the pause safety path
                 logging.exception("Paused-state reservoir refresh failed")
@@ -1160,6 +1261,30 @@ def simulate_profile(profile_name: str, profile_data: dict):
                 reservoir_debug=None
             )
             below_cutoff_now = False
+
+        try:
+            humid_gross = SCALE_SAMPLER.value_humid()
+            hinfo = humid_tracker.update(
+                humid_gross,
+                _humid_tracker_settings(gs),
+                pump_on=False,
+                now_wall_s=now,
+            )
+            status_data["humid_res_gross_kg"] = hinfo.get("gross_kg")
+            status_data["humid_res_water_raw"] = hinfo.get("water_raw")
+            status_data["humid_res_water_kg"] = hinfo.get("water_kg")
+            status_data["humid_reservoir_water_kg"] = hinfo.get("water_kg")
+            status_data["humid_res_status"] = hinfo.get("status_label")
+            status_data["humid_res_debug"] = hinfo.get("debug")
+        except Exception:
+            status_data.update(
+                humid_res_gross_kg=None,
+                humid_res_water_raw=None,
+                humid_res_water_kg=None,
+                humid_reservoir_water_kg=None,
+                humid_res_status=None,
+                humid_res_debug=None,
+            )
 
         # ─── Hard safety limits (edge-based with hysteresis + cooldown) ───
         # Hysteresis values (fallback to your general hysteresis if dedicated one not set)
