@@ -60,14 +60,6 @@ DEFAULTS = {
     # Margin to treat near-full as "full" (helps with scale noise)
     "reservoir_full_margin_kg": 1.0,
 
-    # Humidifier reservoir (kg) — no pump cutoff required
-    "humidifier_reservoir_empty_weight_kg": 2.0,
-    "humidifier_reservoir_full_capacity_kg": 10.0,
-    "humidifier_reservoir_half_water_kg": 5.0,
-    "humidifier_reservoir_low_water_kg": 3.0,
-    "humidifier_reservoir_critical_water_kg": 1.0,
-    "humidifier_reservoir_full_margin_kg": 0.5,
-
     # Premix defaults (NO LEADS)
     "agitator_enabled": False,
     "agitator_run_sec": 15,

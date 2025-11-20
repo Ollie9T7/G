@@ -30,8 +30,8 @@
     .title-block h1 { margin:0 0 6px 0; font-size:20px; font-weight:700; }
     .page-description { margin:0; color:var(--hint); font-size:13px; line-height:1.4; }
     .pill { padding:4px 10px; border-radius:999px; border:1px solid #2a3950; background:var(--well); color:var(--muted); font-size:12px; font-weight:700; text-transform:uppercase; letter-spacing:.02em; }
-    .pill.on { color:#0c141f; background: var(--ok); border-color: #7bd88f; }
-    .pill.off { color:#2b1c24; background:#f18aa1; border-color:#f18aa1; }
+    .pill.on { color:#121212; background: #adfb13; border-color: #adfb13; }
+    .pill.off { color:#ffb6c1; background:#2a1820; border-color:#6b2a3a; }
 
     .banner {
       background: var(--well);
@@ -78,8 +78,8 @@
     .toggle::after {
       content: '';
       position: absolute;
-      top: 4px;
-      left: 4px;
+      top: 3px;
+      left: 3px;
       width: 22px;
       height: 22px;
       background: #fff;
@@ -87,19 +87,19 @@
       transition: transform 0.2s ease;
       box-shadow: 0 2px 6px rgba(0,0,0,0.45);
     }
-    .toggle.on { background: #17305c; border-color:#2a4b7a; box-shadow: 0 0 0 1px rgba(30,92,255,0.1), 0 12px 24px rgba(0,0,0,0.35); }
+    .toggle.on { background: #adfb13; border-color:#2a4b7a; box-shadow: 0 0 0 1px rgba(30,92,255,0.1), 0 12px 24px rgba(0,0,0,0.35); }
     .toggle.on::after { transform: translateX(24px); }
 
     .status-line { color: var(--hint); font-size: 13px; }
     .muted { color: var(--muted); }
     .control-row { display:flex; flex-direction:column; gap:6px; margin-top: 2px; }
-    .input-label { font-size: 11px; color: var(--hint); letter-spacing: .02em; text-transform: uppercase; }
+    .input-label { font-size: 11px; color: var(--hint); letter-spacing: .02em; text-transform: normal; }
     .input-group { display:flex; gap:8px; align-items:center; }
     .input { background: var(--well); border:1px solid var(--border); border-radius: 8px; padding: 7px 9px; color: var(--ink); min-width: 0; width: 100%; font-size:13px; }
     .input:focus { outline: 2px solid #1e5cff; border-color: #1e5cff; }
-    .btn { border:none; border-radius: 8px; padding: 7px 11px; cursor:pointer; font-weight:700; font-size: 12px; letter-spacing: .01em; background:#1e5cff; color:#f2f6ff; display:inline-flex; align-items:center; gap:8px; box-shadow: 0 8px 16px rgba(30,92,255,0.25); }
+    .btn { border:none; border-radius: 8px; padding: 7px 11px; cursor:pointer; font-weight:700; font-size: 12px; letter-spacing: .01em; background:#0171e3; color:#ffffff; display:inline-flex; align-items:center; gap:8px; }
     .btn.ghost { background: transparent; color: var(--muted); border:1px solid var(--border); box-shadow: none; }
-    .btn.danger { background: var(--bad); color:#2b1c24; border:1px solid #ff9a9a; box-shadow: 0 8px 16px rgba(255,123,123,0.3); }
+    .btn.danger { background: #2a1820; color:#ffb6c1; border:1px solid #6b2a3a; }
     .stop-btn { display: none; }
     .stop-btn.visible { display: inline-flex; }
     .btn:disabled { opacity: 0.5; cursor:not-allowed; }
@@ -144,7 +144,7 @@
       { key: 'agitator_pump', label: 'Agitator Pump', icon: 'fa-water' },
       { key: 'air_pump', label: 'Air Pump', icon: 'fa-wind' },
       { key: 'nutrient_pump_a', label: 'Nutrient Pump A', icon: 'fa-flask' },
-      { key: 'nutrient_pump_b', label: 'Nutrient Pump B', icon: 'fa-flask-vial' },
+      { key: 'nutrient_pump_b', label: 'Nutrient Pump B', icon: 'fa-flask' },
       { key: 'nutrient_stirrer', label: 'Nutrient Stirrer', icon: 'fa-martini-glass-citrus' },
     ];
 
@@ -186,7 +186,6 @@
               <button class="btn" data-run="${dev.key}"><i class="fa-solid fa-play"></i><span>Run</span></button>
               <button class="btn stop-btn" data-stop="${dev.key}"><i class="fa-solid fa-stop"></i><span>Stop</span></button>
             </div>
-            <div class="timer-line" id="timer-${dev.key}"></div>
           </div>
         `;
         grid.appendChild(card);
