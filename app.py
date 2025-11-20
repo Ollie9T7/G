@@ -1815,7 +1815,9 @@ app.register_blueprint(manual_bp)
 
 # Scale settings + raw data API (keeps same routes as before)
 from sensors.scale_api import scale_bp
+from sensors.humidity_scale_api import humidity_scale_bp
 app.register_blueprint(scale_bp)     # '/settings/scale', '/api/scale/...'
+app.register_blueprint(humidity_scale_bp)  # '/settings/humidity-scale', '/api/humidity-scale/...'
 
 # ───────────────────────── Cleanup & shutdown ──────────────────────────────
 def cleanup_gpio():
