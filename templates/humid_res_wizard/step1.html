@@ -1,0 +1,200 @@
+<head>
+  <meta charset="utf-8">
+  <title>Humidifier Reservoir Renewal — Step 1</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Open+Sans:ital,wght@0,300..800;1,300..800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+
+  <style>
+    html, body { margin:0; padding:0; }
+    *, *::before, *::after { box-sizing:border-box; }
+
+    :root {
+      --w: 850px; --pad:16px; --gap:14px; --br:10px;
+      --ink:#e7eef7; --muted:#aac2de; --hint:#9bb4d3;
+      --bg:#0b0f14; --card:#121925; --border:#243247; --well:#0d1420; --well2:#1e2a3a;
+      --ok:#7bd88f; --warn:#f7c948; --bad:#ff7b7b; --accent:#adfb13;
+      --value:#9bd2ff;
+    }
+
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; background:var(--bg); color:var(--ink); }
+    .wrap { max-width:var(--w); margin:34px auto; padding:0 calc(var(--pad) + 2px); }
+
+    .btn { font-size:14px; background:var(--well2); color:var(--ink); border:1px solid #2a3950; padding:9px 14px; border-radius:8px; cursor:pointer; text-decoration:none; font-weight:600; }
+    .btn-grey { background:#1a2535; color:#7a8ca8; border-color:#2a3950; }
+    .btn-green { background:var(--accent); color:#121212; border-color:var(--accent); }
+
+    .muted { color:var(--muted); }
+    .pill { padding:2px 8px; border-radius:16px; border:1px solid #2a3950; background:var(--well); color:var(--muted); font-size:12px; }
+    .page-description { margin:0 0 22px 0; font-size:14px; line-height:1.5; color:var(--hint); }
+
+    .box { border:1px solid var(--border); border-radius:8px; background:var(--card); padding:20px; margin:0 0 20px 0; }
+    .box h2 { margin:0 0 8px 0; font-size:18px; }
+
+    .stepper-wide { display:flex; gap:8px; width:100%; margin:0 0 16px 0; }
+    .stepper-wide .seg { flex:1; height:26px; border-radius:6px; background:#2a3950; display:flex; align-items:center; justify-content:center; font-size:12px; color:#a9b8cf; letter-spacing:0.2px; }
+    .stepper-wide .seg.active { background:var(--accent); color:#121212; font-weight:600; }
+    .stepper-wide a.seg { text-decoration:none; }
+    .stepper-wide .seg[aria-current="step"] { pointer-events:none; cursor:default; }
+    .stepper-wide .seg .fa-check { margin-right:6px; font-size:12px; }
+
+    .stepbar { display:flex; align-items:center; justify-content:space-between; margin:30px 0 40px 0; }
+
+    .reading { display:grid; grid-template-columns: 1fr; gap:16px; align-items:center; }
+    .metrics { display:grid; grid-template-columns: repeat(3, 1fr); gap:12px; background:var(--well); border:1px solid #2a3950; border-radius:8px; padding:12px; margin-bottom:12px; }
+    .metric { display:flex; flex-direction:column; gap:4px; }
+    .metric-label { font-size:13px; color:var(--ink); opacity:.95; }
+    .metric-value { font-size:20px; font-weight:600; color:var(--value); }
+
+    .progress{ width:100%; height:24px; background:#0c141f; border:1px solid #22324a; border-radius:3px; overflow:hidden; position:relative; }
+    .progress > div{ height:100%; width:0; transition: width .15s linear; background: linear-gradient(90deg, #0171E3, #39B8FF); --seg-w:9px; --seg-gap:3px; -webkit-mask: repeating-linear-gradient(90deg,#000 0 calc(var(--seg-w)),transparent calc(var(--seg-w)) calc(var(--seg-w) + var(--seg-gap))); mask: repeating-linear-gradient(90deg,#000 0 calc(var(--seg-w)),transparent calc(var(--seg-w)) calc(var(--seg-w) + var(--seg-gap))); }
+
+    .confirm { display:flex; align-items:flex-start; gap:10px; margin-top:12px; font-size:14px; background:var(--well); border:1px solid #2a3950; border-radius:8px; padding:12px; }
+    .confirm input[type="checkbox"] { transform: translateY(2px); }
+
+    .actions { display:flex; gap:12px; justify-content:space-between; margin-top:18px; }
+    .right { display:flex; gap:10px; }
+
+    @media (max-width: 700px) {
+      .metrics { grid-template-columns: 1fr; }
+      .actions { flex-direction:column; }
+      .right { justify-content:flex-end; }
+    }
+  </style>
+</head>
+<body>
+  {% include "header2.html" %}
+
+  <div class="wrap">
+    <div class="stepper-wide" aria-label="Wizard steps">
+      {% set total = 2 %}
+      {% for i in range(1, total + 1) %}
+        {% set is_active = (i == step) %}
+        {% set is_done = (i < step) %}
+        <a class="seg {% if is_active %}active{% endif %}" href="{{ url_for('reservoirs.humid_reservoir_wizard', step=i) }}" {% if is_active %}aria-current="step"{% endif %}>
+          {% if is_done %}<i class="fa fa-check" aria-hidden="true"></i>{% endif %}
+          Step {{ i }}
+        </a>
+      {% endfor %}
+    </div>
+
+    <div class="stepbar">
+      <div>
+        <h1 style="margin:0 0 6px 0; font-size:22px;">Humidifier reservoir renewal</h1>
+        <div class="muted" style="font-size:13px;">Step {{ step }} of 2 — Empty the humidifier reservoir before refilling.</div>
+      </div>
+      <span class="pill" id="liveStamp">live</span>
+    </div>
+
+    <div class="box">
+      <h2>Empty the humidifier reservoir</h2>
+      <p class="page-description">Drain any remaining water. Once the reading is effectively empty, confirm below to continue.</p>
+
+      <div class="reading">
+        <div>
+          <div class="metrics">
+            <div class="metric">
+              <div class="metric-label">Target</div>
+              <div class="metric-value"><span id="targetL">{{ (humid.target_litres or 0)|round(1) }}</span> L</div>
+            </div>
+            <div class="metric">
+              <div class="metric-label">Current</div>
+              <div class="metric-value"><span id="curL">{{ (humid.water_kg or 0)|round(2) }}</span> L</div>
+            </div>
+            <div class="metric">
+              <div class="metric-label">Percent</div>
+              <div class="metric-value"><span id="curPct">{{ (humid.percent or 0)|round(0) }}</span>%</div>
+            </div>
+          </div>
+
+          <div class="progress" aria-label="Overall level">
+            <div id="bar" style="width: {{ (humid.percent or 0) }}%;"></div>
+          </div>
+        </div>
+
+        <div>
+          <div class="confirm">
+            <input type="checkbox" id="confirmEmpty" {% if empty_ok %}checked{% endif %}>
+            <label for="confirmEmpty">
+              Yes — the humidifier reservoir is empty (or as empty as it can be).
+              <div class="muted" style="font-size:12px;margin-top:4px;">
+                Tip: this auto-ticks once the sensor reads effectively empty.
+              </div>
+            </label>
+          </div>
+          <div style="margin-top:10px; font-size:12px; color:var(--hint);" id="thresholdNote">
+            Empty considered at ≤ <b id="emptyThresh">0.05</b> L (safety margin).
+          </div>
+        </div>
+      </div>
+
+      <div class="actions">
+        <div></div>
+        <form method="post" action="{{ url_for('reservoirs.humid_reservoir_wizard', step=1) }}">
+          <input type="hidden" name="action" value="confirm_empty">
+          <button class="btn btn-grey" id="nextBtn" type="submit" disabled>Good to go →</button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    (function(){
+      const $ = (s)=>document.querySelector(s);
+      const fmt = (v, d=2)=> (v==null || isNaN(v)) ? '—' : Number(v).toFixed(d);
+
+      const EMPTY_LITRES_THRESHOLD = 0.05;
+      $('#emptyThresh').textContent = EMPTY_LITRES_THRESHOLD.toFixed(2);
+
+      const confirmBox = $('#confirmEmpty');
+      const nextBtn = $('#nextBtn');
+
+      function updateNextState(){
+        const enabled = confirmBox.checked;
+        nextBtn.disabled = !enabled;
+        if(enabled){
+          nextBtn.classList.remove('btn-grey');
+          nextBtn.classList.add('btn-green');
+        }else{
+          nextBtn.classList.remove('btn-green');
+          nextBtn.classList.add('btn-grey');
+        }
+      }
+
+      confirmBox.addEventListener('change', updateNextState);
+      updateNextState();
+
+      async function poll(){
+        try{
+          const r = await fetch('/api/reservoirs/live', {cache:'no-store'});
+          const j = await r.json();
+          const h = j && j.humidifier ? j.humidifier : {};
+
+          const litres = (typeof h.water_kg === 'number') ? h.water_kg : null;
+          const pct    = (typeof h.percent === 'number') ? h.percent : null;
+
+          if(litres !== null) $('#curL').textContent = fmt(litres, 2);
+          if(pct !== null){
+            $('#curPct').textContent = Math.round(pct);
+            $('#bar').style.width = Math.max(0, Math.min(100, pct)) + '%';
+          }
+
+          if (litres !== null && litres <= EMPTY_LITRES_THRESHOLD){
+            confirmBox.checked = true;
+          }
+          updateNextState();
+
+          const ls = $('#liveStamp');
+          if(ls) ls.textContent = 'live • ' + new Date().toLocaleTimeString();
+        }catch(e){}
+      }
+
+      poll();
+      setInterval(poll, 900);
+    })();
+  </script>
+</body>
+</html>

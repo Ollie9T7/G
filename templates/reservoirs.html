@@ -36,6 +36,7 @@
 
     .topbar { display:flex; align-items:center; gap:12px; margin-bottom:18px; }
     .btn { background:var(--well2); color:var(--ink); border:1px solid #2a3950; padding:8px 12px; border-radius:8px; cursor:pointer; text-decoration:none; }
+    .btn { font-size:14px; font-weight:600; min-height:38px; padding:9px 14px; display:inline-flex; align-items:center; justify-content:center; gap:8px; white-space:nowrap; }
     .btn:disabled { opacity:.55; cursor:not-allowed; }
     h1 { font-size: 22px; margin:0; }
     .btn-grey {
@@ -196,6 +197,12 @@
         </span>
       </div>
     {% endif %}
+    {% if completion_message == 'humid_renewal_complete' %}
+      <div class="flash" role="status">
+        <i class="fa-solid fa-circle-check"></i>
+        <span>Humidifier reservoir renewal complete.</span>
+      </div>
+    {% endif %}
 
     <div class="topbar">
       <h1>Reservoir Management</h1>
@@ -250,7 +257,38 @@
       </div>
     </fieldset>
 
-    <!-- (Humidifier section to go here) -->
+    <fieldset class="res-box" id="humid-box">
+      <legend>Humidifier reservoir</legend>
+
+      <div class="row1">
+        <div class="pct">
+          <div class="big"><span id="humid-pct">--</span>%</div>
+        </div>
+        <div class="bar">
+          <div class="bar-inner">
+            <div class="progress" title="Humidifier level towards target">
+              <div id="humid-bar"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="row2">
+        <div class="data">
+          <div class="kv">
+            <div>Status: <b id="humid-status">—</b></div>
+            <div>Last fill: <b id="humid-last">—</b></div>
+            <div>Water left: <b id="humid-left">—</b> L</div>
+            <div>Water used: <b id="humid-used">—</b> L</div>
+          </div>
+        </div>
+        <div class="action">
+          <button id="humid-renew-btn" class="btn btn-grey" type="button" data-tip="Not required yet" title="Start the humidifier renewal wizard">
+            <i class="fa fa-sync"></i>&nbsp; Renew humidifier
+          </button>
+        </div>
+      </div>
+    </fieldset>
 
   </div>
 
@@ -266,6 +304,27 @@
       SETTINGS = null;
     }
     return SETTINGS;
+  }
+
+  // Basic helpers for gating the Renew buttons
+  function isCriticalReservoir(d){
+    if (d && typeof d.is_critical === 'boolean') return d.is_critical;
+    if (d && typeof d.percent === 'number') return d.percent <= 10;
+    return false;
+  }
+
+  async function applyButtonState(d){
+    const btn = document.getElementById('renew-btn');
+    if (!btn) return;
+    const critical = isCriticalReservoir(d);
+    btn.classList.remove('btn-green','btn-grey');
+    if (critical){
+      btn.classList.add('btn-green');
+      btn.dataset.tip = 'Low level — renew now';
+    } else {
+      btn.classList.add('btn-grey');
+      btn.dataset.tip = 'Not required yet';
+    }
   }
 
   // === Hard gate for Renew until Stop clicked ===
@@ -315,6 +374,30 @@
       } finally {
         stopBtn.disabled = false;
         stopBtn.innerHTML = originalHtml;
+      }
+    });
+  })();
+
+  // Humidifier renewal starter (no pause/cutoff required)
+  (function(){
+    const humidBtn = document.getElementById('humid-renew-btn');
+    if (!humidBtn) return;
+
+    const wizardUrl = "{{ url_for('reservoirs.humid_reservoir_wizard', step=1) }}";
+
+    humidBtn.addEventListener('click', async () => {
+      const original = humidBtn.innerHTML;
+      humidBtn.disabled = true;
+      humidBtn.innerHTML = '<i class="fa fa-spinner fa-spin"></i>&nbsp; Starting…';
+      try {
+        const r = await fetch('/api/humid-reservoir/renewal/begin', { method: 'POST' });
+        if (!r.ok) throw new Error('begin_failed');
+        window.location.href = wizardUrl;
+      } catch (e) {
+        alert('Could not start humidifier renewal.');
+      } finally {
+        humidBtn.disabled = false;
+        humidBtn.innerHTML = original;
       }
     });
   })();
@@ -391,9 +474,65 @@
     setInterval(poll, 800);
     poll();
   })();
+
+  // Humidifier live card
+  (function(){
+    const $ = s => document.querySelector(s);
+    const fmtPct = v => (v==null||isNaN(v)) ? "--" : Math.round(v);
+
+    function setHumidRenewState(d){
+      const btn = document.getElementById('humid-renew-btn');
+      if (!btn) return;
+      const critical = Boolean(d && d.is_critical);
+      btn.classList.remove('btn-green','btn-grey');
+      if (critical){
+        btn.classList.add('btn-green');
+        btn.removeAttribute('aria-disabled');
+        btn.dataset.tip = 'Ready – level is low';
+        btn.disabled = false;
+      } else {
+        btn.classList.add('btn-grey');
+        btn.dataset.tip = 'Not required yet';
+        btn.setAttribute('aria-disabled', 'true');
+        btn.disabled = false; // keep clickable for tooltip; JS gate handles navigation
+      }
+    }
+
+    async function applyHumid(d){
+      $('#humid-pct').textContent = fmtPct(d.percent);
+      $('#humid-bar').style.width = ((d.percent||0)) + '%';
+      $('#humid-status').textContent = d.status_label || '—';
+      $('#humid-last').textContent = d.last_fill ? new Date(d.last_fill).toLocaleString() : '—';
+
+      const water = (typeof d.water_kg === 'number') ? d.water_kg : null;
+      $('#humid-left').textContent = water === null ? '—' : water.toFixed(2);
+
+      let used = null;
+      const s = await loadSettingsOnce();
+      const cap = Number(s?.humid_res_full_capacity_kg ?? 0);
+      if (cap > 0 && water !== null) used = Math.max(0, cap - water);
+      $('#humid-used').textContent = (used === null || isNaN(used)) ? '—' : used.toFixed(2);
+
+      setHumidRenewState(d || {});
+    }
+
+    async function poll(){
+      try{
+        const r = await fetch('/api/reservoirs/live', { cache: 'no-store' });
+        const j = await r.json();
+        const humid = j.humidifier || {};
+        await applyHumid(humid);
+        const el = document.getElementById('liveStamp');
+        if (el) el.textContent = 'live • ' + new Date().toLocaleTimeString();
+      }catch(e){ }
+    }
+
+    setInterval(poll, 900);
+    poll();
+  })();
+
 </script>
+
 
 </body>
 </html>
-
-

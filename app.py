@@ -70,7 +70,7 @@ from sensors.dht import read_humidity_top_bottom
 from sensors.ds18b20 import read_air_temps_top_bottom, read_water_temp
 from sensors.reservoir_eval import ReservoirTracker
 from reservoirs.routes import reservoirs_bp
-from reservoirs.persistence import load_last_fill_iso
+from reservoirs.persistence import load_last_fill_iso, load_humid_last_fill_iso
 
 
 # ── Scale (HX711) raw access (sampler below uses it internally) ───────────
@@ -168,6 +168,7 @@ status_data = {
     "reservoir_water_kg": None,
     "pump_cycle_res_before_kg": None,
     "reservoir_last_fill_iso": load_last_fill_iso(),
+    "humid_res_last_fill_iso": load_humid_last_fill_iso(),
 
     # Manual overrides (per-device state + timers)
     "manual_overrides": {},
@@ -270,6 +271,8 @@ class _ScaleSampler:
         self.n = int(n)
         self._val = None
         self._humid_val = None
+        self._raw_counts = None
+        self._raw_counts_humid = None
         self._lock = threading.Lock()
         self._t = None
         self._stop = threading.Event()
@@ -293,6 +296,14 @@ class _ScaleSampler:
     def value_humid(self):
         with self._lock:
             return self._humid_val
+
+    def counts(self):
+        with self._lock:
+            return self._raw_counts
+
+    def counts_humid(self):
+        with self._lock:
+            return self._raw_counts_humid
 
     def _run(self):
         from sensors.scale import (
@@ -319,9 +330,17 @@ class _ScaleSampler:
                         empty = float(gs.get("reservoir_empty_weight_kg", 0.0) or 0.0)
                         gross_kg = empty + water_kg
                         with self._lock:
+                            self._raw_counts = counts
                             self._val = gross_kg
+                    else:
+                        with self._lock:
+                            self._raw_counts = None
+                else:
+                    with self._lock:
+                        self._raw_counts = None
             except Exception:
-                pass
+                with self._lock:
+                    self._raw_counts = None
             try:
                 hcal = _load_humid_scale_cal()
                 if hcal:
@@ -335,9 +354,17 @@ class _ScaleSampler:
                         hempty = float(hgs.get("humid_res_empty_weight_kg", 0.0) or 0.0)
                         hgross_kg = hempty + hwater_kg
                         with self._lock:
+                            self._raw_counts_humid = hcounts
                             self._humid_val = hgross_kg
+                    else:
+                        with self._lock:
+                            self._raw_counts_humid = None
+                else:
+                    with self._lock:
+                        self._raw_counts_humid = None
             except Exception:
-                pass
+                with self._lock:
+                    self._raw_counts_humid = None
             self._stop.wait(self.period_s)
 
 # Global sampler instance
@@ -955,6 +982,96 @@ def simulate_profile(profile_name: str, profile_data: dict):
         return False
 
 
+    def _soft_alert(
+        name: str,
+        breach_now: bool,
+        recovered_now: bool,
+        msg: str,
+        cooldown_s: int = 300,
+        payload: dict | None = None,
+    ) -> bool:
+        """
+        Soft (non-cutoff) alerting for informational warnings.
+        Does NOT drive hard-stop behaviour or last_error; just tracks state + notifies.
+        Returns True if currently active.
+        """
+        now_ts = time.time()
+        st = _alert_state(name)
+
+        if breach_now and not st["active"]:
+            st.update({
+                "active": True,
+                "first_triggered": now_ts,
+                "last_notified": 0.0,
+                "message": msg,
+            })
+            _log_alert(name, "breach", msg, payload)
+            try:
+                send_discord(f"⚠️ {msg}")
+            except Exception:
+                pass
+            return True
+
+        if breach_now and st["active"]:
+            if (now_ts - (st.get("last_notified") or 0.0)) >= float(cooldown_s or 0):
+                st["last_notified"] = now_ts
+                try:
+                    send_discord(f"⚠️ Still breached: {msg}")
+                except Exception:
+                    pass
+            return True
+
+        if recovered_now and st["active"]:
+            st.update({"active": False, "message": None})
+            _log_alert(name, "recover", f"Recovered: {msg}", payload)
+            try:
+                send_discord(f"✅ Recovered: {msg}")
+            except Exception:
+                pass
+            return False
+
+        return st.get("active", False)
+
+
+    def _update_humid_alerts(water_kg: float | None, gs_local: dict, cooldown_s: int = 300) -> dict:
+        """
+        Single critical alert/log/discord when humidifier reservoir is critical.
+        Returns {"critical": bool}.
+        """
+        try:
+            crit = float(gs_local.get("humid_res_critical_water_kg", 0.0) or 0.0)
+            hyst = float(gs_local.get("humid_res_full_margin_kg", 0.0) or 0.0)
+        except Exception:
+            crit = 0.0; hyst = 0.0
+
+        water_val = None if water_kg is None else float(water_kg)
+        crit_breach = bool(crit > 0 and water_val is not None and water_val <= crit)
+        crit_recover = bool(water_val is not None and crit > 0 and water_val > (crit + max(hyst, 0.25)))
+        crit_msg = (
+            f"Humidifier reservoir {water_val:.2f} kg – CRITICAL. Humidifier module is offline until reservoir is renewed."
+            if water_val is not None else
+            "Humidifier reservoir critically low – module offline until renewed."
+        )
+        crit_payload = {"water_kg": water_val, "critical_kg": crit, "hysteresis_kg": hyst}
+
+        crit_active = _soft_alert(
+            "humid_reservoir_critical",
+            crit_breach,
+            crit_recover or (water_val is None),
+            crit_msg,
+            cooldown_s,
+            payload=crit_payload,
+        )
+
+        if crit_active:
+            status_data["last_error"] = "Humidifier module offline until reservoir is renewed"
+        elif status_data.get("last_error") == "Humidifier module offline until reservoir is renewed":
+            status_data["last_error"] = None
+
+        status_data["humid_reservoir_critical"] = bool(crit_active)
+        return {"critical": bool(crit_active)}
+
+
 
 
 
@@ -1138,6 +1255,14 @@ def simulate_profile(profile_name: str, profile_data: dict):
                     status_data["humid_reservoir_water_kg"] = hinfo.get("water_kg")
                     status_data["humid_res_status"] = hinfo.get("status_label")
                     status_data["humid_res_debug"] = hinfo.get("debug")
+                    try:
+                        _update_humid_alerts(
+                            hinfo.get("water_kg"),
+                            gs,
+                            int(gs.get("hard_alert_cooldown_s") or 300),
+                        )
+                    except Exception:
+                        pass
                 except Exception:
                     status_data.update(
                         humid_res_gross_kg=None,
@@ -1276,6 +1401,14 @@ def simulate_profile(profile_name: str, profile_data: dict):
             status_data["humid_reservoir_water_kg"] = hinfo.get("water_kg")
             status_data["humid_res_status"] = hinfo.get("status_label")
             status_data["humid_res_debug"] = hinfo.get("debug")
+            try:
+                _update_humid_alerts(
+                    hinfo.get("water_kg"),
+                    gs,
+                    int(gs.get("hard_alert_cooldown_s") or 300),
+                )
+            except Exception:
+                pass
         except Exception:
             status_data.update(
                 humid_res_gross_kg=None,
@@ -1471,6 +1604,7 @@ def simulate_profile(profile_name: str, profile_data: dict):
 
 
         # ─── Climate control (fan/heater/humidifier) ───
+        humid_critical = bool(status_data.get("humid_reservoir_critical"))
         if _manual_active("extractor"):
             desired = _manual_on("extractor")
             _set_fan(desired)
@@ -1537,8 +1671,13 @@ def simulate_profile(profile_name: str, profile_data: dict):
                     status_data["heater_state"] = "ON" if heater_should_on else "OFF"
 
             # humidifier
-            if _manual_active("humidifier"):
+            if humid_critical:
+                _set_humidifier(False)
+                status_data["humidifier_state"] = "OFF"
+            elif _manual_active("humidifier"):
                 desired_humid = _manual_on("humidifier")
+                if humid_critical:
+                    desired_humid = False
                 _set_humidifier(desired_humid)
                 status_data["humidifier_state"] = "ON" if desired_humid else "OFF"
             else:
@@ -2016,6 +2155,3 @@ if __name__ == '__main__':
                 cleanup_gpio()
             except Exception:
                 pass
-
-
-

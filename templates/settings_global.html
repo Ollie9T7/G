@@ -342,9 +342,49 @@
         <div class="hint">Margin for showing “Full”. Example: if usable = 20 kg and margin = 1 kg, the UI shows “Full” down to 19 kg to avoid flicker.</div>
 
         <div class="hint">
-          All thresholds are in <b>kg of water</b> (gross weight − empty weight).  
+          All thresholds are in <b>kg of water</b> (gross weight − empty weight).
           “Critical” gives a warning; “Cutoff” actually stops pump cycles and raises an alert.
         </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Humidifier reservoir</legend>
+
+        <div class="row">
+          <label for="humid_res_empty_weight_kg">Empty gross weight (kg)</label>
+          <input id="humid_res_empty_weight_kg" name="humid_res_empty_weight_kg" type="number" step="0.1" value="{{ s.humid_res_empty_weight_kg }}">
+        </div>
+        <div class="hint">Gross weight of the humidifier reservoir hardware with no water.</div>
+
+        <div class="row">
+          <label for="humid_res_full_capacity_kg">Full capacity (kg of water)</label>
+          <input id="humid_res_full_capacity_kg" name="humid_res_full_capacity_kg" type="number" step="0.1" value="{{ s.humid_res_full_capacity_kg }}">
+        </div>
+        <div class="hint">Net water at your “full” line for the humidifier reservoir. Derives gross full = empty gross + this capacity.</div>
+
+        <div class="row">
+          <label for="humid_res_half_water_kg">Half – kg of water remaining</label>
+          <input id="humid_res_half_water_kg" name="humid_res_half_water_kg" type="number" step="0.1" value="{{ s.humid_res_half_water_kg }}">
+        </div>
+        <div class="hint">Status threshold for “Half” on the humidifier reservoir.</div>
+
+        <div class="row">
+          <label for="humid_res_low_water_kg">Low – kg of water remaining</label>
+          <input id="humid_res_low_water_kg" name="humid_res_low_water_kg" type="number" step="0.1" value="{{ s.humid_res_low_water_kg }}">
+        </div>
+        <div class="hint">Warning threshold for “Low”. This reservoir does not drive any pumps.</div>
+
+        <div class="row">
+          <label for="humid_res_critical_water_kg">Critical – kg of water remaining</label>
+          <input id="humid_res_critical_water_kg" name="humid_res_critical_water_kg" type="number" step="0.1" value="{{ s.humid_res_critical_water_kg }}">
+        </div>
+        <div class="hint">Critical warning threshold (alert only; no cutoff).</div>
+
+        <div class="row">
+          <label for="humid_res_full_margin_kg">Full margin (kg)</label>
+          <input id="humid_res_full_margin_kg" name="humid_res_full_margin_kg" type="number" step="0.1" value="{{ s.humid_res_full_margin_kg }}">
+        </div>
+        <div class="hint">Margin for showing “Full” on the humidifier reservoir, to avoid flicker.</div>
       </fieldset>
 
       <div class="btnbar right">

@@ -372,6 +372,23 @@
           <div>Capacity: <span id="water-capacity">—</span><span class="unit">kg</span></div>
         </div>
       </div>
+
+      <!-- Humidifier Reservoir -->
+      <div id="card-humid-reservoir" class="card null">
+        <div class="card-header">Humidifier Reservoir <span id="badge-humid-reservoir" class="badge null">null</span></div>
+        <div class="card-value">
+          <span id="humid-res-kg">null</span><span class="unit">kg</span>
+        </div>
+
+        <div class="res-progress" aria-hidden="true">
+          <div id="humid-res-bar" class="res-progress__bar res-bar--ok" style="width:0%"></div>
+        </div>
+
+        <div class="card-meta">
+          <div>Remaining: <span id="humid-res-pct">—</span><span class="unit">%</span></div>
+          <div>Capacity: <span id="humid-res-capacity">—</span><span class="unit">kg</span></div>
+        </div>
+      </div>
     </div>
 
     <!-- Live System Status (rebuilt) -->
@@ -810,6 +827,47 @@
     else if (severity === 'red') barClass = 'res-bar--error';
     barEl.style.width = `${pct}%`; barEl.className = `res-progress__bar ${barClass}`;
   }
+  function updateHumidResCard(d){
+    const card  = document.getElementById('card-humid-reservoir');
+    const badge = document.getElementById('badge-humid-reservoir');
+    const barEl = document.getElementById('humid-res-bar');
+    if (!card || !badge || !barEl) return;
+
+    card.classList.remove('null'); badge.classList.remove('null');
+    const water = d?.humid_res_water_kg ?? d?.humid_reservoir_water_kg;
+    const usable = d?.humid_res_debug?.usable;
+    const rawStat = d?.humid_res_status;
+
+    if (!isFiniteNum(water) || !isFiniteNum(usable) || usable <= 0) {
+      return nullifyCard(card, badge, () => {
+        setTxt('humid-res-kg', 'null'); setTxt('humid-res-pct', '—'); setTxt('humid-res-capacity', '—');
+        barEl.style.width = '0%'; barEl.className = 'res-progress__bar res-bar--ok';
+      });
+    }
+
+    const w = Number(water);
+    const cap = Number(usable);
+    const pct = Math.max(0, Math.min(100, (w / cap) * 100));
+    setTxt('humid-res-kg', `${num1(w)}`); setTxt('humid-res-pct', `${pct0(pct)}`); setTxt('humid-res-capacity', `${num1(cap)}`);
+
+    const norm = normalizeWaterStatus(rawStat);
+    let severity = 'green', label = 'OK';
+    if (norm === 'critical' || norm === 'cutoff') { severity = 'red'; label = 'Critical'; }
+    else if (norm === 'low') { severity = 'red'; label = 'Low'; }
+    else if (pct < 50) { severity = 'yellow'; label = 'Less than half'; }
+    else if (pct >= 99) { severity = 'green'; label = 'Full'; }
+
+    badge.classList.remove('ok','warn','softwarn');
+    if (severity === 'red') { card.classList.add('out-of-range'); badge.classList.add('warn'); }
+    else if (severity === 'yellow') { card.classList.remove('out-of-range'); badge.classList.add('softwarn'); }
+    else { card.classList.remove('out-of-range'); badge.classList.add('ok'); }
+    badge.textContent = label;
+
+    let barClass = 'res-bar--OK';
+    if (severity === 'yellow') barClass = 'res-bar--warn';
+    else if (severity === 'red') barClass = 'res-bar--error';
+    barEl.style.width = `${pct}%`; barEl.className = `res-progress__bar ${barClass}`;
+  }
 function updateSensors(d){
   const thresholdsActive = !!d?.profile;
 
@@ -822,6 +880,7 @@ function updateSensors(d){
     }
     // Reservoir behaves as normal
     updateWaterCard(d);
+    updateHumidResCard(d);
     return;
   }
 
@@ -837,6 +896,7 @@ function updateSensors(d){
   }
 
   updateWaterCard(d);
+  updateHumidResCard(d);
 }
 
 
@@ -1204,6 +1264,3 @@ window.addEventListener('load', start);
 
 </body>
 </html>
-
-
-

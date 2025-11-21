@@ -94,14 +94,27 @@ def _compute_from_counts(scale_id: str, counts: float | None, cal: dict | None):
 
 def _api_scale_raw(scale_id: str):
     defs = _scale_defs()[scale_id]
-    # Make sure RPi.GPIO mode is set before touching HX711
-    try:
-        current_app.config["CTX"]["_ensure_gpio_mode"]()
-    except Exception:
-        pass
+    ctx = current_app.config.get("CTX", {})
+    sampler = ctx.get("SCALE_SAMPLER")
 
-    with defs["lock"]:
-        counts = defs["reader"](6)
+    # Use the background sampler’s cached counts by default to keep the UI responsive.
+    fresh = str(request.args.get("fresh", "")).lower() in ("1", "true", "yes", "fresh")
+    counts = None
+    if sampler and not fresh:
+        try:
+            getter = sampler.counts_humid if scale_id == "humid_res" else sampler.counts
+            counts = getter()
+        except Exception:
+            counts = None
+
+    if counts is None:
+        # Make sure RPi.GPIO mode is set before touching HX711
+        try:
+            current_app.config["CTX"]["_ensure_gpio_mode"]()
+        except Exception:
+            pass
+        with defs["lock"]:
+            counts = defs["reader"](6)
     cal = defs["cal_loader"]()
 
     water_kg, gross_kg, label = _compute_from_counts(scale_id, counts, cal)
@@ -206,6 +219,5 @@ def api_scale_cal_commit():
 @scale_bp.route("/api/scale/humid_res/cal/commit", methods=["POST"])
 def api_scale_cal_commit_humid():
     return _api_scale_cal_commit("humid_res")
-
 
 

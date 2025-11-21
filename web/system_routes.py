@@ -88,6 +88,8 @@ def status_json():
         "humid_reservoir_water_kg": sd.get("humid_reservoir_water_kg"),
         "humid_res_status":    sd.get("humid_res_status"),
         "humid_res_debug":     sd.get("humid_res_debug"),
+        "reservoir_last_fill_iso": sd.get("reservoir_last_fill_iso"),
+        "humid_res_last_fill_iso": sd.get("humid_res_last_fill_iso"),
     })
     payload["water_quantity"] = (
         payload["reservoir_water_kg"]
@@ -170,6 +172,13 @@ def settings_global():
             "reservoir_critical_water_kg",
             "reservoir_pump_cutoff_water_kg",
             "reservoir_full_margin_kg",
+            # Humidifier reservoir (no pumps/cutoff)
+            "humid_res_empty_weight_kg",
+            "humid_res_full_capacity_kg",
+            "humid_res_half_water_kg",
+            "humid_res_low_water_kg",
+            "humid_res_critical_water_kg",
+            "humid_res_full_margin_kg",
             "agitator_enabled", "agitator_run_sec",
             "air_pump_enabled","air_pump_run_sec",
             "water_temp_min_c","water_temp_target_c","water_temp_max_c",
@@ -192,5 +201,4 @@ def settings_global():
             cfg = {**cfg, **raw}
 
     return render_template("settings_global.html", s=cfg)
-
 

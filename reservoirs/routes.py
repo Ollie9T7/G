@@ -27,7 +27,7 @@ from global_settings import (
 )
 import time  # <-- ADDED (used by /api/reservoirs/dose)
 import threading
-from reservoirs.persistence import save_last_fill_iso
+from reservoirs.persistence import save_last_fill_iso, save_humid_last_fill_iso
 
 
 
@@ -240,6 +240,73 @@ def reservoir_wizard():
 
 
 
+
+
+@reservoirs_bp.route("/reservoirs/humid/wizard", methods=["GET", "POST"])
+def humid_reservoir_wizard():
+    step = int(request.args.get("step", "1") or 1)
+    if step < 1 or step > 2:
+        return redirect(url_for("reservoirs.humid_reservoir_wizard", step=1))
+
+    ctx = _CTX()
+    gs = ctx["load_global_settings"]()
+    humid = _compute_humid_res_status()
+
+    if request.method == "POST":
+        action = request.form.get("action") or ""
+
+        if step == 1 and action == "confirm_empty":
+            session["humid_wizard_empty_ok"] = True
+            return redirect(url_for("reservoirs.humid_reservoir_wizard", step=2))
+
+        if action == "back":
+            return redirect(url_for("reservoirs.humid_reservoir_wizard", step=max(1, step - 1)))
+
+        if step == 2 and action in ("finish", "next"):
+            from datetime import datetime, timezone
+            try:
+                ctx["status_data"]["humid_reservoir_renewal_active"] = False
+            except Exception:
+                pass
+            # Stamp last fill for humidifier reservoir + persist
+            now_utc = datetime.now(timezone.utc)
+            iso_utc = now_utc.strftime("%Y-%m-%dT%H:%M:%S.%fZ")
+            iso_local = now_utc.astimezone().isoformat()
+            try:
+                ctx["status_data"]["humid_res_last_fill_iso"] = iso_utc
+            except Exception:
+                pass
+            try:
+                save_humid_last_fill_iso(iso_utc)
+            except Exception:
+                pass
+            try:
+                ctx["LOGGER"].log_event(
+                    "humid_reservoir_renewal",
+                    "Humidifier reservoir renewal complete",
+                    reason_code="complete",
+                    actor="manual_labour",
+                    payload={
+                        "completed_at_utc": iso_utc,
+                        "completed_at_local": iso_local,
+                    },
+                    ts_utc=iso_utc,
+                    ts_local=iso_local,
+                )
+            except Exception:
+                pass
+            session.pop("humid_wizard_empty_ok", None)
+            return redirect(url_for("reservoirs.reservoirs_page", message="humid_renewal_complete"))
+
+    tpl_name = f"humid_res_wizard/step{step}.html"
+    return render_template(
+        tpl_name,
+        step=step,
+        gs=gs,
+        humid=humid,
+        empty_ok=bool(session.get("humid_wizard_empty_ok")),
+    )
+
 @reservoirs_bp.route("/reservoirs/calibration", methods=["GET"])
 def reservoirs_calibration_page():
     """Simple page for calibrating nutrient pumps (A/B)."""
@@ -424,6 +491,7 @@ def _compute_humid_res_status():
     ctx = _CTX()
     gs  = ctx["load_global_settings"]()
     sd  = ctx["status_data"]
+    status_label = sd.get("humid_res_status")
 
     water_kg = sd.get("humid_res_water_kg")
     if water_kg is None:
@@ -448,6 +516,15 @@ def _compute_humid_res_status():
     usable_kg = humid_usable_capacity_kg(gs)
     empty_gross = float(gs.get("humid_res_empty_weight_kg", 0.0) or 0.0)
     gross_kg = None if water_kg is None else empty_gross + float(water_kg)
+    target_litres = round(usable_kg, 2) if usable_kg > 0 else None
+    last_fill = sd.get("humid_res_last_fill_iso")
+    crit_threshold = None
+    try:
+        raw_crit = gs.get("humid_res_critical_water_kg")
+        if raw_crit not in (None, ""):
+            crit_threshold = float(raw_crit)
+    except Exception:
+        crit_threshold = None
 
     if water_kg is None:
         percent = None
@@ -470,10 +547,12 @@ def _compute_humid_res_status():
         "profile_running": sd.get("profile"),
         "water_temp_c": None,
         "water_kg": (None if water_kg is None else round(float(water_kg), 3)),
-        "target_litres": None,
-        "is_critical": False,
-        "critical_threshold_kg": None,
+        "target_litres": target_litres,
+        "is_critical": bool(crit_threshold is not None and water_kg is not None and float(water_kg) <= crit_threshold),
+        "critical_threshold_kg": crit_threshold,
         "gross_kg": gross_kg,
+        "status_label": status_label,
+        "last_fill": last_fill,
     }
 
 
@@ -630,6 +709,11 @@ def api_reservoirs_renewal_begin():
             "Reservoir renewal: BEGIN",
             reason_code="begin",
             profile_id=pid,
+            actor="manual_labour",
+            payload={
+                "started_at_local": time.strftime("%Y-%m-%d %H:%M:%S"),
+                "started_at_epoch": sd.get("reservoir_renewal_began_at"),
+            },
         )
 
     except Exception:
@@ -657,10 +741,69 @@ def api_reservoirs_renewal_end():
     except Exception:
         pass
 
+    return jsonify({"ok": True})
+
+
+@reservoirs_bp.route("/api/humid-reservoir/renewal/begin", methods=["POST"])
+def api_humid_reservoir_renewal_begin():
+    """Log the start of a humidifier reservoir renewal (no pause/cutoff)."""
+    import time as _t, time
+    ctx = _CTX()
+    sd = ctx["status_data"]
+    logger = ctx["LOGGER"]
+
     try:
-        logger.log_event("reservoir_renewal", "Reservoir renewal: END")
+        sd["humid_reservoir_renewal_active"] = True
+        sd["humid_reservoir_renewal_began_at"] = _t.time()
     except Exception:
         pass
+
+    try:
+        logger.log_event(
+            "humid_reservoir_renewal",
+            "Humidifier reservoir renewal: BEGIN",
+            reason_code="begin",
+            actor="manual_labour",
+            payload={
+                "started_at_local": time.strftime("%Y-%m-%d %H:%M:%S"),
+                "started_at_epoch": sd.get("humid_reservoir_renewal_began_at"),
+            },
+        )
+    except Exception:
+        pass
+
+    return jsonify({"ok": True})
+
+
+@reservoirs_bp.route("/api/humid-reservoir/renewal/end", methods=["POST"])
+def api_humid_reservoir_renewal_end():
+    """Log the completion of a humidifier reservoir renewal."""
+    import time as _t
+    from datetime import datetime, timezone
+    ctx = _CTX()
+    sd = ctx["status_data"]
+    logger = ctx["LOGGER"]
+
+    try:
+        sd["humid_reservoir_renewal_active"] = False
+        sd["humid_reservoir_renewal_completed_at"] = _t.time()
+    except Exception:
+        pass
+
+    # Stamp last fill at completion time
+    now_utc = datetime.now(timezone.utc)
+    iso_utc = now_utc.strftime("%Y-%m-%dT%H:%M:%S.%fZ")
+    iso_local = now_utc.astimezone().isoformat()
+    try:
+        sd["humid_res_last_fill_iso"] = iso_utc
+    except Exception:
+        pass
+    try:
+        save_humid_last_fill_iso(iso_utc)
+    except Exception:
+        pass
+
+    # Single complete log happens when finish is pressed in the wizard; avoid duplicates here.
 
     return jsonify({"ok": True})
 
@@ -1065,6 +1208,7 @@ def api_reservoirs_complete():
             "Reservoir renewal complete",
             reason_code="complete",
             profile_id=pid,
+            actor="manual_labour",
             payload=payload,
             ts_utc=iso_utc,
             ts_local=iso_local,
@@ -1221,5 +1365,3 @@ def api_nutrient_record_measurement():
         pass
 
     return jsonify({"ok": True, "cal": cal})
-
-

@@ -1,0 +1,295 @@
+<head>
+  <meta charset="utf-8">
+  <title>Humidifier Reservoir Renewal — Step 2</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Open+Sans:ital,wght@0,300..800;1,300..800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+
+  <style>
+    :root {
+      --w: 850px; --pad:16px; --gap:14px; --br:10px;
+      --ink:#e7eef7; --muted:#aac2de; --hint:#9bb4d3;
+      --bg:#0b0f14; --card:#121925; --border:#243247; --well:#0d1420; --well2:#1e2a3a;
+      --ok:#7bd88f; --warn:#f7c948; --bad:#ff7b7b; --accent:#ADFB13;
+    }
+    html, body { margin:0; padding:0; }
+    *, *::before, *::after { box-sizing:border-box; }
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; background:var(--bg); color:var(--ink); }
+
+    .wrap { max-width:var(--w); margin:34px auto; padding:0 calc(var(--pad) + 2px); }
+    .pill { padding:2px 8px; border-radius:16px; border:1px solid #2a3950; background:var(--well); color:var(--muted); font-size:12px; }
+    .btn { font-size:14px; background:var(--well2); color:var(--ink); border:1px solid #2a3950; padding:9px 14px; border-radius:8px; cursor:pointer; text-decoration:none; font-weight:600; }
+    .btn-grey { background:#1a2535; color:#7a8ca8; border-color:#2a3950; }
+    .btn-green { background:var(--accent); color:#121212; border-color:var(--accent); }
+
+    .muted { color:var(--muted); }
+
+    .stepper-wide { display:flex; gap:8px; width:100%; margin:0 0 16px 0; }
+    .stepper-wide .seg { flex:1; height:26px; border-radius:6px; background:#2a3950;
+      display:flex; align-items:center; justify-content:center;
+      font-size:12px; color:#a9b8cf; letter-spacing:0.2px; }
+    .stepper-wide .seg.active { background:var(--accent); color:#121212; font-weight:600; }
+    .stepper-wide a.seg { text-decoration:none; }
+    .stepper-wide .seg[aria-current="step"] { pointer-events:none; cursor:default; }
+    .stepper-wide .seg .fa-check { margin-right:6px; font-size:12px; }
+
+    .stepbar { display:flex; align-items:center; justify-content:space-between; margin:30px 0 40px 0; }
+    h1 { font-size:22px; margin:0; }
+
+    fieldset.box { border:1px solid var(--border); border-radius:8px; background:var(--card); padding:var(--pad); margin:0 0 18px 0; }
+
+    .grid { display:grid; gap:18px; grid-template-columns: 1fr; }
+
+    .progress { width:100%; height:48px; background:#0c141f; border:1px solid #22324a; border-radius:4px; overflow:hidden; position:relative; }
+    .progress>.fill { height:100%; width:0%; transition:width .12s linear;
+      background:linear-gradient(90deg,#0171E3,#39B8FF);
+      --seg-w:9px;--seg-gap:3px;
+      -webkit-mask:repeating-linear-gradient(90deg,#000 0 calc(var(--seg-w)),transparent calc(var(--seg-w)) calc(var(--seg-w)+var(--seg-gap)));
+      mask:repeating-linear-gradient(90deg,#000 0 calc(var(--seg-w)),transparent calc(var(--seg-w)) calc(var(--seg-w)+var(--seg-gap)));
+      box-shadow:inset 0 0 0 1px rgba(123,216,143,.06); }
+    .progress .label { position:absolute; top:50%; left:12px; transform:translateY(-50%); font-size:15px; font-weight:700; color:var(--ink); text-shadow:0 1px 2px rgba(0,0,0,.6); }
+
+    .fine { position:relative; height:56px; border:1px solid #22324a; background:#0c141f; border-radius:4px; overflow:hidden; }
+    .fine .zones { position:absolute; inset:0; display:grid; grid-template-columns: 1fr 120px 1fr; }
+    .fine .zone-under,.fine .zone-over { background:rgba(255,123,123,0.06); }
+    .fine .zone-sweet { background:rgba(173,251,19,0.12); border-left:1px dashed rgba(173,251,19,0.5); border-right:1px dashed rgba(173,251,19,0.5); }
+    .fine .zone-perfect{
+      position:absolute; top:0; bottom:0;
+      left:50%; width:24px; transform:translateX(-50%);
+      background:rgba(173,251,19,0.25); border-left:1px solid rgba(173,251,19,0.7); border-right:1px solid rgba(173,251,19,0.7);
+      box-shadow:0 0 18px rgba(173,251,19,0.3) inset;
+    }
+    .fine .labels { position:absolute; inset:0; display:flex; align-items:center; justify-content:space-between; padding:0 10px; font-size:12px; color:var(--hint); }
+    /* .fine .marker { ... } */
+    .fine .dot {
+      position:absolute; top:50%; transform:translate(-50%,-50%);
+      width:14px; height:14px; border-radius:50%;
+      background:#39B8FF; box-shadow:0 0 0 4px rgba(57,184,255,0.18), 0 6px 10px rgba(0,0,0,0.35);
+      left:50%; transition:left .12s linear;
+      left: var(--pos, 50%);
+    }
+
+    .kv { display:flex; gap:12px 18px; flex-wrap:wrap; font-size:13px; color:var(--hint); }
+    .kv b { color:var(--ink); }
+
+    .actions { display:flex; justify-content:space-between; gap:10px; margin-top:10px; }
+    .note { font-size:12px; color:var(--hint); margin-top:6px; }
+
+  #cele-toast {
+    position: fixed;
+    z-index: 60;
+    left: 50%;
+    top: 20%;
+    transform: translateX(-50%) scale(0.9);
+    background: #121925;
+    color: #ADFB13;
+    border: 2px solid #ADFB13;
+    padding: 18px 28px;
+    border-radius: 14px;
+    font-size: 26px;
+    font-weight: 800;
+    letter-spacing: 0.5px;
+    text-align: center;
+    box-shadow:
+      0 0 20px rgba(173,251,19,0.3),
+      0 0 60px rgba(173,251,19,0.15);
+    opacity: 0;
+    transition: opacity .4s ease, transform .4s ease;
+    display: none;
+  }
+  #cele-toast.show {
+    opacity: 1;
+    transform: translateX(-50%) scale(1);
+    animation: toast-pop 0.6s ease-out;
+  }
+
+  @keyframes toast-pop {
+    0%   { transform: translateX(-50%) scale(0.8); opacity: 0; }
+    40%  { transform: translateX(-50%) scale(1.05); opacity: 1; }
+    70%  { transform: translateX(-50%) scale(0.97); }
+    100% { transform: translateX(-50%) scale(1); }
+  }
+
+    #confetti-root{ pointer-events:none; position: fixed; inset: 0; z-index: 59; overflow: hidden; }
+    .confetti{ position:absolute; width:10px; height:16px; opacity:0.9; will-change: transform, opacity; }
+
+    @media (max-width: 700px) {
+      .actions { flex-direction:column; }
+    }
+  </style>
+</head>
+<body>
+  {% include "header2.html" %}
+  <div class="wrap">
+    <div class="stepper-wide" aria-label="Wizard steps">
+      {% set total = 2 %}
+      {% for i in range(1, total + 1) %}
+        {% set is_active = (i == step) %}
+        {% set is_done = (i < step) %}
+        <a class="seg {% if is_active %}active{% endif %}" href="{{ url_for('reservoirs.humid_reservoir_wizard', step=i) }}" {% if is_active %}aria-current="step"{% endif %}>
+          {% if is_done %}<i class="fa fa-check" aria-hidden="true"></i>{% endif %}
+          Step {{ i }}
+        </a>
+      {% endfor %}
+    </div>
+
+    <div class="stepbar">
+      <div>
+        <h1 style="margin:0 0 6px 0; font-size:22px;">Humidifier reservoir renewal</h1>
+        <div class="muted" style="font-size:13px;">Step {{ step }} of 2 — Refill to target.</div>
+      </div>
+      <span class="pill" id="liveStamp">live</span>
+    </div>
+
+    <fieldset class="box">
+      <legend>Fill to target</legend>
+      <div class="grid">
+        <div class="kv">
+          <div>Target: <b><span id="targetL">—</span> L</b></div>
+          <div>Remaining: <b><span id="remainL">—</span> L</b></div>
+          <div>Measured: <b><span id="measuredL">—</span> L</b></div>
+        </div>
+
+        <div>
+          <div class="progress"><div class="fill" id="overallFill"></div><div class="label"><span id="pctLabel">--</span>%</div></div>
+          <div class="note">Progress to your humidifier reservoir target.</div>
+        </div>
+
+        <div>
+          <div class="fine">
+            <div class="zones"><div class="zone-under"></div><div class="zone-sweet"></div><div class="zone-over"></div></div>
+            <div class="zone-perfect" aria-hidden="true"></div>
+            <div class="labels"><span>Underfilled</span><span>Sweet spot</span><span>Overfilled</span></div>
+            <div class="dot" id="fineDot" style="--pos:50%"></div>
+          </div>
+          <div class="note">Aim to centre the marker in the green sweet spot.</div>
+        </div>
+      </div>
+
+      <div class="actions">
+        <div></div>
+        <form method="post" action="{{ url_for('reservoirs.humid_reservoir_wizard', step=2) }}">
+          <input type="hidden" name="action" value="finish">
+          <button id="finishBtn" class="btn btn-green" type="submit">
+            Finish renewal <i class="fa fa-check"></i>
+          </button>
+        </form>
+      </div>
+    </fieldset>
+  </div>
+
+  <div id="cele-toast">Perfect Level! 🥳</div>
+  <div id="confetti-root" aria-hidden="true"></div>
+
+  <script>
+    (function(){
+  const $ = (s)=>document.querySelector(s);
+  const fmt = (v, d=2)=> (v==null || isNaN(v)) ? '—' : Number(v).toFixed(d);
+  const clamp = (v,min,max)=> Math.max(min, Math.min(max, v));
+  const CELE_COOLDOWN_MS = 10000;
+  let _lastCeleMs = 0;
+  let _celeShown = false;
+
+  function showToastOnce(){
+    const now = Date.now();
+    if (_celeShown || (now - _lastCeleMs < CELE_COOLDOWN_MS)) return;
+    _lastCeleMs = now;
+    _celeShown = true;
+    const t=document.getElementById('cele-toast'); if(!t)return;
+    t.style.display='block';
+    requestAnimationFrame(()=>{t.classList.add('show');setTimeout(()=>t.classList.remove('show'),1200);setTimeout(()=>t.style.display='none',3000);});
+  }
+  function burstConfetti(){
+    const root=document.getElementById('confetti-root'); if(!root)return;
+    const colors=['#39B8FF','#ADFB13','#7BD88F','#39B8FF'];
+    for(let i=0;i<60;i++){
+      const el=document.createElement('div');
+      el.className='confetti';
+      const left=Math.random()*100;
+      const delay=Math.random()*0.2;
+      const duration=1.5+Math.random()*0.8;
+      const rotate=(Math.random()*360);
+      el.style.backgroundColor=colors[i%colors.length];
+      el.style.left=`${left}%`;
+      el.style.top='-10px';
+      el.animate([
+        {transform:`translate3d(0,0,0) rotate(${rotate}deg)`, opacity:1},
+        {transform:`translate3d(${(Math.random()*60-30)}px, 120vh, 0) rotate(${rotate+180}deg)`, opacity:0}
+      ], {duration: duration*1000, delay: delay*1000, easing:'ease-out', fill:'forwards'});
+      root.appendChild(el);
+      setTimeout(()=>root.removeChild(el), (duration+delay+0.5)*1000);
+    }
+  }
+
+  async function poll(){
+    try{
+      const r = await fetch('/api/reservoirs/live', {cache:'no-store'});
+      const j = await r.json();
+      const h = j && j.humidifier ? j.humidifier : {};
+
+      const target = (typeof h.target_litres === 'number' && h.target_litres > 0) ? h.target_litres : null;
+      const litres = (typeof h.water_kg === 'number') ? h.water_kg : null;
+      const pct    = (typeof h.percent === 'number') ? h.percent : null;
+      let fine     = (typeof h.fine === 'number') ? h.fine : null;
+
+      $('#targetL').textContent  = fmt(target, 2);
+      $('#measuredL').textContent = fmt(litres, 2);
+
+          let remaining = null;
+          if (target !== null && litres !== null){
+            remaining = Math.max(0, target - litres);
+          }
+          $('#remainL').textContent = fmt(remaining, 2);
+
+      if(pct !== null){
+        $('#pctLabel').textContent = Math.round(pct);
+        $('#overallFill').style.width = Math.max(0, Math.min(100, pct)) + '%';
+      }
+
+      // Fine gauge (reuse main reservoir logic)
+      if (fine === null){
+        if(target != null && litres != null){
+          const delta = target - litres;
+          if (Math.abs(delta) >= 1){
+            fine = (delta > 0) ? 0 : 1;
+          } else {
+            fine = clamp(0.5 - (delta / 2), 0, 1);
+          }
+        } else {
+          fine = 0.5;
+        }
+      }
+      const pos = (fine * 100).toFixed(2) + '%';
+      const elDot = document.querySelector('#fineDot');
+      if (elDot) elDot.style.setProperty('--pos', pos);
+
+      const fineEl=document.querySelector('.fine');
+      if (fineEl){
+        const fineWidthPx = fineEl.clientWidth || 600;
+        const perfectBandPx = 24;
+        const tol = (perfectBandPx / fineWidthPx) / 2;
+        const inPerfect = (fine >= 0.5 - tol && fine <= 0.5 + tol);
+        if (inPerfect){
+          showToastOnce();
+          burstConfetti();
+        }
+        else {
+          // allow one more celebration if user overshoots then returns
+          _celeShown = false;
+        }
+      }
+
+      const ls = $('#liveStamp');
+      if(ls) ls.textContent = 'live • ' + new Date().toLocaleTimeString();
+    }catch(e){}
+  }
+
+      poll();
+      setInterval(poll, 950);
+    })();
+  </script>
+</body>
+</html>

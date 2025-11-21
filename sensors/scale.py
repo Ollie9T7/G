@@ -2,6 +2,9 @@
 import os, json, statistics, threading
 import RPi.GPIO as GPIO
 GPIO.setwarnings(False)
+# Ensure pins use BCM numbering (required before interacting with GPIO)
+if GPIO.getmode() is None:
+    GPIO.setmode(GPIO.BCM)
 
 try:
     from hx711 import HX711

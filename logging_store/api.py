@@ -18,13 +18,16 @@ def list_events():
     Simple UI log view: recent notable events.
     Query:
       limit (int) default 200
-      types=comma,separated,list  (actuator_change,irrigation_cycle,alert,profile_lifecycle)
+      types=comma,separated,list  (actuator_change,irrigation_cycle,alert,profile_lifecycle,reservoir_renewal,humid_reservoir_renewal)
     """
     limit = int(request.args.get("limit", 200))
-    types = request.args.get(
+    types_raw = request.args.get(
         "types",
-        "actuator_change,irrigation_cycle,alert,profile_lifecycle"
-    ).split(",")
+        "actuator_change,irrigation_cycle,alert,profile_lifecycle,reservoir_renewal,humid_reservoir_renewal"
+    )
+    types = [t for t in (types_raw.split(",") if types_raw else []) if t.strip()]
+    if not types:
+        types = ["actuator_change", "irrigation_cycle", "alert", "profile_lifecycle", "reservoir_renewal", "humid_reservoir_renewal"]
 
     qmarks = ",".join("?" for _ in types)
 
@@ -146,6 +149,5 @@ def export_csv():
         mimetype="text/csv",
         headers={"Content-Disposition": f'attachment; filename=\"%s\"' % filename}
     )
-
 
 
